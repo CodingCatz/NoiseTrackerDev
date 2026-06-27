@@ -1,1829 +1,813 @@
-# Claude Code 專案 SPEC：FHD 2D 精準平台跳躍遊戲（Precision Platformer · 到達終點通關）
+# 精準平台跳躍遊戲 — 製作規格書（定稿）
 
-> 文件用途：這份 SPEC 是給 **Claude Code** 依序執行的專案規格文件。  
-> 目標是建立一款以 **Phaser + Vite + TypeScript** 製作的 **FHD 1920×1080 2D 精準平台跳躍網頁遊戲（Precision Platformer，Celeste-like，無敵人、無戰鬥）**，並透過 **GitHub Actions 自動部署到 GitHub Pages**。
+| 項目 | 內容 |
+| --- | --- |
+| 文件版本 | v0.1.0（定稿，可據以動工） |
+| 文件狀態 | 9 段全數定稿；各段決策已拍板（見每段「本段決策」） |
+| 技術棧 | Phaser 4.1 + Vite 8 + TypeScript 6.0（Arcade 物理） |
+| 部署 | GitHub Actions → GitHub Pages |
+| 基準解析度 | 1920 × 1080（FIT 等比縮放） |
+| 拍板人 | Catz |
 
----
-
-## 0. 專案總覽
-
-### 0.1 遊戲類型
-
-```txt
-2D Precision Platformer（精準平台跳躍，Celeste-like）
-FHD 平台跳躍 × 關卡探索 × 物理手感 × Tilemap 機關 × 到達終點通關（無敵人、無戰鬥）
-```
-
-本專案不是橫向卷軸射擊，也不是俯視角倖存者。  
-本專案重點是：
-
-```txt
-玩家手感、跳躍物理、碰撞容錯、Tilemap 關卡、探索機關、多檔案重構與除錯。
-```
-
-### 0.2 對應 AI 工具
-
-```txt
-Claude Code
-```
-
-Claude Code 這座專案的教學價值是讓學生練習：
-
-1. 把複雜 PlayerController 拆成可維護模組
-2. 用 AI 協助調整跳躍手感
-3. 用 AI 檢查碰撞、Tilemap、Camera 問題
-4. 用 AI 重構 GameScene，避免所有邏輯塞在同一檔案
-5. 用 AI 反覆執行 build / test / debug
-6. 用 Git 留下階段性修改紀錄
+> **本文件為權威製作規格**，取代先前的 Phase 0–21 草案。
+> `course/` 下的教學教材（講稿 + 網頁簡報）依本規格製作；若實作與教材有出入，**以本文件為準**。
+> 第 4 段所有物理數值皆為「起始值」，手感須實際玩過用身體調（見 9.4）。
 
 ---
 
-## 1. 共同解析度與單位制
+## 1. 專案概述與設計原則
 
-三座遊戲專案共同使用相同標準。
+### 1.1 遊戲定位
 
-```ts
-export const GAME_WIDTH = 1920;
-export const GAME_HEIGHT = 1080;
-export const UNIT = GAME_HEIGHT * 0.1; // 108 px
+純粹的 **2D 精準平台跳躍遊戲**（precision platformer），參考座標是 Celeste、Super Meat Boy、N++ 這一類。
+
+- **無敵人、無戰鬥、無血量。** 死亡是二元的：碰到陷阱即死，回到最近的紀錄點重生。
+- 挑戰來自**地形本身**與**操作精度**，不是來自對手。
+- 手感（game feel）是這個專案的命脈。物理參數調不好，這遊戲就是垃圾，沒有美術或關卡能救。
+
+### 1.2 核心玩法迴圈
+
+```
+進入關卡 → 從紀錄點出生
+  → 用 跳躍 / 二段跳 / 牆跳 / 衝刺 通過地形
+  → 互動：踩開關、撿鑰匙、開門
+  → 失誤碰陷阱 → 即死 → 回最近紀錄點（迴圈內重來，不中斷流程）
+  → 抵達終點 → 通關
 ```
 
-定義：
+重點：**死亡重生必須快、無懲罰、零等待**。重生有任何卡頓或動畫拖延都是設計失敗。
 
-```txt
-1 距離單位 = 畫面高度 10% = 108 px
-```
+### 1.3 玩家能力清單
 
-因此：
+| 能力 | 說明 | 備註 |
+| --- | --- | --- |
+| 水平移動 | 左右移動，有加速度與摩擦力，非瞬間滿速 | 手感關鍵 |
+| 跳躍 | 可變高度（按住跳更高、放開即截斷上升） | 手感關鍵 |
+| 二段跳 | 空中再跳一次，落地或牆跳後重置 | |
+| 牆跳 | 貼牆時跳離牆面，給一個反向水平推力 | |
+| 衝刺（dash） | 朝輸入方向快速位移，接觸地/牆重置（見第 4 段） | |
 
-```txt
-畫面寬度 = 17.78 units
-畫面高度 = 10 units
-```
+> 容錯機制（coyote time、jump buffer、牆跳寬限）屬「手感規格」，數值與判定窗口全部在第 4 段定義。
 
-### 1.1 單位換算
+### 1.4 關卡互動元素清單
 
-```ts
-export function u(value: number): number {
-  return value * UNIT;
-}
+| 元素 | 行為 | 即死？ |
+| --- | --- | --- |
+| 地形（平台／牆） | 可站立、可貼牆，碰撞解析 | 否 |
+| 陷阱 | 觸碰即死，回紀錄點 | **是** |
+| 開關 | 啟動後觸發某狀態（開門等） | 否 |
+| 鑰匙 | 撿取後可開對應的門 | 否 |
+| 門 | 鎖定狀態擋路，條件滿足後開啟 | 否 |
+| 紀錄點 | 通過後更新重生點 | 否 |
+| 終點 | 抵達即通關 | 否 |
 
-export function pxToUnit(value: number): number {
-  return value / UNIT;
-}
-```
+### 1.5 範圍界定（YAGNI — 這版「不做」什麼）
 
-### 1.2 速度單位
+- ❌ 敵人、戰鬥、傷害數值、擊退、血量條
+- ❌ 道具欄、裝備、技能樹、升級系統
+- ❌ 程序生成關卡（關卡為手工設計、資料驅動）
+- ❌ 多人連線
+- ❌ 對話系統、劇情分支
+- ❌ 存檔系統的複雜化（最多 localStorage 記通關進度）
+- ❌ **移動平台**（列為進階選配，要加時當「開關的 target」接上，見 5.6）
+- ❌ **能力拾取解鎖**（能力一開始就有，關卡靠地形＋鑰匙/門卡關，不靠鎖能力）
 
-所有速度必須優先使用：
+> 任何不在「能力清單／互動清單」裡的功能，預設**不做**，要做先回到規格書補一段、由拍板人定。
 
-```txt
-unit / second
-```
+### 1.6 核心設計原則
 
-例如：
+1. **解析度無關設計**：所有設計數值用「單位」表達，**只在唯一一處**轉成 px。換解析度只動一個常數。
+2. **容錯即正常情況，不是補丁**：coyote time、jump buffer 直接設計進輸入流程的正常路徑。
+3. **死亡二元化，重生零成本**：碰陷阱＝死，無血量、無擊退；重生＝瞬間回紀錄點、狀態完全重置。
+4. **資料驅動關卡**：地形、陷阱、開關、鑰匙、門、紀錄點、終點全部用資料定義，程式只讀資料生成。
 
-| 設定 | unit/s | px/s |
-|---|---:|---:|
-| 慢走 | 2.5 | 270 |
-| 一般奔跑 | 5.5 | 594 |
-| 衝刺 | 16.7 | 1803.6 |
-| 最大下落 | 14 | 1512 |
+### 1.7 本段決策（已定）
 
-### 1.3 自適應顯示
-
-遊戲邏輯解析度固定為 1920×1080。  
-實際顯示以 Phaser Scale Manager 等比例縮放。
-
-建議：
-
-```ts
-scale: {
-  mode: Phaser.Scale.FIT,
-  autoCenter: Phaser.Scale.CENTER_BOTH,
-  width: GAME_WIDTH,
-  height: GAME_HEIGHT,
-}
-```
-
-要求：
-
-- PC / Mobile 皆可等比例顯示
-- 手機可以 letterbox
-- 遊戲邏輯座標不可因螢幕比例改變
-- UI 使用 FHD 邏輯座標定位
-- Mobile 觸控按鈕為選配，不能破壞鍵盤操作
+1. 專案代號 `precision-platformer`（正式名稱之後再定）。
+2. 做關卡內計時顯示，不做排行榜。
+3. 通關進度存 localStorage（只記最高通關關卡，不做雲端／多存檔）。
+4. 開發期全用純色方塊佔位，手感與邏輯做穩再換素材。
 
 ---
 
-## 2. 最終完成目標
+## 2. 技術架構與專案結構
 
-完成一款可公開部署的 FHD 2D 精準平台跳躍遊戲（Precision Platformer），具備：
+### 2.1 套件版本（2026/06 現況）
 
-1. 1920×1080 FHD 邏輯解析度
-2. 1 unit = 108 px 的標準化單位制
-3. 可左右移動、跳躍、可變跳高
-4. Coyote Time 與 Jump Buffer
-5. 二段跳
-6. 空中衝刺 Dash
-7. 牆滑與牆跳
-8. Tilemap 地形碰撞
-9. Camera 跟隨與關卡邊界
-10. 鑰匙、門、開關、移動平台、陷阱
-11. Checkpoint 與死亡重生
-12. Debug overlay 顯示物理狀態
-13. 可 `npm run build`
-14. 可 push 到 GitHub 後自動部署到 GitHub Pages
+| 套件 | 鎖定版本 | 備註 |
+| --- | --- | --- |
+| Node.js | 22.x LTS | Vite 8 要求 20.19+ 或 22.12+ |
+| Phaser | **4.1.x** | 重寫渲染器；破壞性變更集中在 FX/Mask/Shader，本純 Arcade 平台遊戲用不到 |
+| Vite | **8.1.x** | 單一 Rolldown bundler |
+| TypeScript | **6.0.x** | npm `latest` 穩定版 |
+| ESLint + typescript-eslint / Prettier | 最新穩定 | 可選 |
 
----
+> 鎖版策略：`package.json` 用 `^` 鎖在當前 minor，避免 `npm install` 拉上大版本打爛專案。
 
-## 3. 遊戲設計概念
+### 2.2 物理引擎：Arcade，不是 Matter.js
 
-### 3.1 核心玩法
+精準平台一律用 **Arcade**（AABB 軸對齊矩形）。理由：
 
-```txt
-玩家在橫向平台關卡中探索
-→ 透過跳躍、二段跳、牆跳、衝刺通過地形
-→ 啟動開關、取得鑰匙、打開門
-→ 避開陷阱（spike / saw / pit）
-→ 抵達終點即通關
-```
+- 精準平台要**可預測、可重現**的物理——同輸入永遠同結果。
+- Matter.js 的剛體會旋轉、有摩擦擾動、會卡角，與「像素級精準」是天敵。
+- 玩家的跳躍/牆跳/衝刺手感是**自己寫的速度控制**；Arcade 只負責「碰撞偵測與分離」，其餘我們接管。
 
-### 3.2 關卡長度
+### 2.3 專案資料夾結構
 
-MVP 建議：
-
-```txt
-單一關卡：約 3–5 分鐘可完成
-```
-
-正式版可擴充：
-
-```txt
-3 個區域：教學區、探索區、挑戰區
-```
-
-### 3.3 遊戲視角
-
-```txt
-2D side-view
-橫向平台視角
-```
-
-不是 Top-down，也不是 STG。
-
----
-
-## 4. 世界與 Tilemap 規格
-
-### 4.1 世界尺寸
-
-MVP 世界建議：
-
-```txt
-World Width：80 units = 8640 px
-World Height：20 units = 2160 px
-```
-
-進階版本：
-
-```txt
-World Width：120 units = 12960 px
-World Height：30 units = 3240 px
-```
-
-### 4.2 Tile 尺寸
-
-建議 tile size：
-
-```txt
-0.5 unit = 54 px
-```
-
-因此 FHD 畫面：
-
-```txt
-1920 / 54 ≈ 35.56 tiles
-1080 / 54 = 20 tiles
-```
-
-這個尺寸適合平台遊戲：
-
-- 角色高度可接近 1 unit
-- 平台厚度 0.5 unit
-- 地形可讀性高
-- Tilemap 不會過於細碎
-
-### 4.3 Tile 類型
-
-| tile id | 名稱 | 行為 |
-|---|---|---|
-| ground | 地面 | 可站立，可碰撞 |
-| one_way | 單向平台 | 可從下方穿過，上方站立 |
-| spike | 尖刺 | 接觸即死亡並重生到 checkpoint |
-| water | 水 / 毒池 | 減速或持續傷害，選配 |
-| ladder | 梯子 | 可攀爬，選配 |
-| wall | 牆面 | 可牆滑 / 牆跳 |
-| breakable | 可破壞牆 | 進階 |
-| goal | 終點 | 通關 |
-
-MVP 必做：
-
-```txt
-ground、one_way、spike、wall、goal
-```
-
----
-
-## 5. 玩家尺寸與碰撞盒
-
-### 5.1 玩家視覺尺寸
-
-```txt
-Visual Width：0.7 unit = 75.6 px
-Visual Height：1.0 unit = 108 px
-```
-
-### 5.2 玩家碰撞盒
-
-```txt
-Collider Width：0.45 unit = 48.6 px
-Collider Height：0.85 unit = 91.8 px
-```
-
-原因：
-
-- 視覺比碰撞盒稍大，降低平台遊戲挫折感
-- 腳底碰撞需穩定
-- 左右碰撞不要太寬，避免擦邊卡住
-
-### 5.3 玩家起始位置
-
-```txt
-x = 2 units
-y = 14 units
-```
-
-實際位置需依關卡地形微調。
-
----
-
-## 6. 玩家移動物理規格
-
-本專案的核心是平台跳躍手感。  
-所有數值都以 unit/s 或 unit/s² 設計。
-
-### 6.1 基礎水平移動
-
-| 參數 | 數值 | 說明 |
-|---|---:|---|
-| maxRunSpeed | 5.5 unit/s | 最大水平速度 |
-| groundAcceleration | 35 unit/s² | 地面加速度 |
-| groundDeceleration | 40 unit/s² | 地面減速度 |
-| airAcceleration | 22 unit/s² | 空中加速度 |
-| airDeceleration | 10 unit/s² | 空中減速度 |
-| turnAcceleration | 50 unit/s² | 反向轉身加速度 |
-
-### 6.2 重力與下落
-
-| 參數 | 數值 | 說明 |
-|---|---:|---|
-| gravity | 28 unit/s² | 基礎重力 |
-| maxFallSpeed | 14 unit/s | 最大下落速度 |
-| fastFallSpeed | 18 unit/s | 按下方向鍵時快速下落，選配 |
-| apexGravityMultiplier | 0.75 | 跳躍頂點附近降低重力，增加滯空感 |
-| fallGravityMultiplier | 1.25 | 下落時略增重力，增加俐落感 |
-
-### 6.3 跳躍
-
-| 參數 | 數值 | 說明 |
-|---|---:|---|
-| jumpHeight | 2.2 units | 標準跳躍高度 |
-| jumpVelocity | 約 11.1 unit/s | 可由 gravity 與高度推導 |
-| minJumpHeight | 0.9 unit | 放開跳躍鍵後的最低跳高 |
-| jumpCutMultiplier | 0.45 | 提早放開跳躍鍵時削減 y velocity |
-
-跳躍速度可用公式推導：
-
-```txt
-jumpVelocity = sqrt(2 × gravity × jumpHeight)
-```
-
-以 gravity = 28，jumpHeight = 2.2 計算：
-
-```txt
-sqrt(2 × 28 × 2.2) ≈ 11.1 unit/s
-```
-
-### 6.4 Coyote Time
-
-```txt
-coyoteTimeMs = 100
-```
-
-玩家離開平台後 100ms 內仍可跳躍。  
-用來降低邊緣跳躍挫折。
-
-### 6.5 Jump Buffer
-
-```txt
-jumpBufferMs = 120
-```
-
-玩家在落地前 120ms 按下跳躍，落地瞬間自動跳起。  
-用來改善操作容錯。
-
-### 6.6 可變跳高
-
-當玩家提前放開跳躍鍵：
-
-```txt
-if velocityY < 0:
-  velocityY *= jumpCutMultiplier
-```
-
-目的：
-
-- 短按 = 小跳
-- 長按 = 高跳
-
----
-
-## 7. 可解鎖移動能力
-
-本專案是精準平台跳躍探索遊戲，因此移動能力可作為關卡推進門檻。
-
-### 7.1 能力總表
-
-| 能力 | 初始可用 | 用途 |
-|---|---|---|
-| 基礎跳躍 | 是 | 核心移動 |
-| 二段跳 | 否 | 抵達較高平台 |
-| 空中衝刺 | 否 | 穿越水平缺口 |
-| 牆滑 | 否 | 靠牆下降 |
-| 牆跳 | 否 | 垂直區域探索 |
-| 下砸 | 否 | 破壞地板，選配 |
-
-MVP 解鎖順序：
-
-```txt
-基礎跳躍 → 二段跳 → 空中衝刺 → 牆滑 / 牆跳 → 終點挑戰
-```
-
-### 7.2 二段跳 Double Jump
-
-| 參數 | 數值 |
-|---|---:|
-| doubleJumpHeight | 1.8 units |
-| doubleJumpVelocity | 約 10.0 unit/s |
-| maxAirJumps | 1 |
-| resetOnGround | true |
-
-規則：
-
-- 玩家離地後可再跳一次
-- 落地後重置
-- 牆跳後也可重置或不重置，MVP 建議重置一次
-
-### 7.3 空中衝刺 Dash
-
-| 參數 | 數值 |
-|---|---:|
-| dashDistance | 3 units |
-| dashDuration | 0.18 s |
-| dashSpeed | 16.7 unit/s |
-| dashCooldown | 0.4 s |
-| maxAirDashes | 1 |
-
-規則：
-
-- Dash 方向依輸入方向決定
-- 若沒有方向輸入，預設往面向方向衝刺
-- Dash 期間可暫時降低重力或關閉重力
-- Dash 結束後恢復正常物理
-- 落地後重置空中 Dash
-
-### 7.4 牆滑 Wall Slide
-
-| 參數 | 數值 |
-|---|---:|
-| wallSlideMaxFallSpeed | 3.5 unit/s |
-| wallStickMs | 80 ms |
-
-規則：
-
-- 玩家貼牆且下落時進入 wall slide
-- 限制最大下落速度
-- 不可在地面觸發
-
-### 7.5 牆跳 Wall Jump
-
-| 參數 | 數值 |
-|---|---:|
-| wallJumpXVelocity | 6.5 unit/s |
-| wallJumpYVelocity | 10.5 unit/s |
-| wallJumpLockMs | 120 ms |
-
-規則：
-
-- 牆跳會將玩家推離牆面
-- 短時間內鎖定水平輸入，避免立刻貼回牆面
-- 牆跳後可恢復空中控制
-
-### 7.6 下砸 Ground Pound，選配
-
-| 參數 | 數值 |
-|---|---:|
-| groundPoundSpeed | 20 unit/s |
-| shockRadius | 1.2 units |
-
-MVP 不必做。  
-可作為進階課程或作業加分項目。
-
----
-
-## 8. 操作對照（無戰鬥）
-
-本專案為純平台跳躍探索遊戲，**無敵人、無戰鬥、無攻擊**。  
-玩家透過移動與跳躍能力通過地形、避開陷阱，抵達終點即通關（Celeste-like）。
-
-### 8.1 操作
-
-| 操作 | 功能 |
-|---|---|
-| ← → / A D | 左右移動 |
-| Space / W / ↑ | 跳躍 / 二段跳 |
-| Shift / L / C | Dash |
-| E | 互動（開關、門） |
-| F3 | Debug overlay 開關 |
-
-### 8.2 死亡來源
-
-本專案沒有 HP 概念，死亡為即時判定（與 Celeste 一致）：
-
-| 來源 | 行為 |
-|---|---|
-| spike | 碰到即死亡，立即回到最近 checkpoint |
-| saw | 碰到即死亡，立即回到最近 checkpoint |
-| pit | 掉落深淵即死亡，立即回到最近 checkpoint |
-
-死亡不扣血、不淘汰，只是重生到最近 checkpoint，鼓勵反覆挑戰高難度地形。
-
----
-
-## 9. 探索機關
-
-### 9.1 鑰匙 Key
-
-規則：
-
-- 玩家取得 key 後，UI 顯示 key count
-- key 可打開 locked door
-- key 可為單一消耗品
-
-### 9.2 門 Door
-
-門類型：
-
-| 類型 | 條件 |
-|---|---|
-| locked_door | 需要 key |
-| switch_door | 需要開關啟動 |
-| ability_gate | 需要特定能力才能通過 |
-
-### 9.3 開關 Switch
-
-類型：
-
-| 類型 | 行為 |
-|---|---|
-| toggle | 按一次切換狀態 |
-| timed | 啟動後一段時間內有效 |
-| pressure | 站上去時有效 |
-
-MVP：
-
-```txt
-toggle switch
-```
-
-### 9.4 移動平台 Moving Platform
-
-| 參數 | 數值 |
-|---|---:|
-| speed | 1.5 unit/s |
-| waitAtEnd | 0.5 s |
-
-移動方式：
-
-- 水平移動
-- 垂直移動
-- 兩點來回
-
-玩家站在移動平台上時，需穩定跟隨平台移動。
-
-### 9.5 陷阱 Hazard
-
-類型：
-
-| 類型 | 行為 |
-|---|---|
-| spike | 碰到即死亡並重生到 checkpoint |
-| saw | 來回移動的鋸刃，碰到即死亡並重生到 checkpoint |
-| pit | 掉落後死亡並重生到 checkpoint |
-
-MVP：
-
-```txt
-spike、pit
-```
-
----
-
-## 10. Checkpoint 與重生
-
-### 10.1 Checkpoint 規則
-
-- 玩家碰到 checkpoint 後啟用
-- 碰到陷阱死亡或掉落深淵時回到最近 checkpoint
-- checkpoint 啟用後有視覺變化
-
-### 10.2 死亡判定
-
-```txt
-// 掉落深淵
-if player.y > worldHeight + 3 units:
-  respawnAtCheckpoint()
-
-// 碰到陷阱（spike / saw）
-onHazardOverlap:
-  respawnAtCheckpoint()
-```
-
-### 10.3 重生規則
-
-重生時：
-
-- 回到 checkpoint 座標
-- 速度歸零、PlayerState 重置為 idle
-- 保留已取得能力與 key 狀態，或依設計清除 temporary key
-
-MVP 建議：
-
-```txt
-保留已取得能力
-key 是否保留由門設計決定
-```
-
----
-
-## 11. Camera 規格
-
-### 11.1 Camera 跟隨
-
-- Camera 跟隨玩家
-- 需設定 world bounds
-- 需加入平滑跟隨
-
-建議：
-
-```txt
-followLerpX = 0.08
-followLerpY = 0.08
-```
-
-### 11.2 Camera Dead Zone，選配
-
-可設定 dead zone 降低鏡頭晃動。
-
-```txt
-deadZoneWidth = 4 units
-deadZoneHeight = 2.5 units
-```
-
-### 11.3 Camera Shake
-
-玩家死亡、落地重擊可觸發輕微震動。
-
-```txt
-smallShake = 100 ms, intensity 0.003
-largeShake = 250 ms, intensity 0.008
-```
-
----
-
-## 12. UI 規格
-
-### 12.1 HUD
-
-需顯示：
-
-- Key count
-- 已取得能力 icons
-- 目前 checkpoint / 區域名稱
-- 死亡次數（選配，Celeste 式統計）
-- Debug 狀態，開啟時才顯示
-
-### 12.2 Debug Overlay
-
-按 F3 開關。
-
-Debug 顯示：
-
-```txt
-x, y position in unit
-velocityX, velocityY in unit/s
-isGrounded
-isTouchingWall
-isWallSliding
-canCoyoteJump
-jumpBufferRemaining
-airJumpCount
-canDash
-currentState
-FPS / frame time
-```
-
-這是 Claude Code 專案非常重要的教學點。  
-平台遊戲手感除錯必須可視化狀態。
-
----
-
-## 13. 狀態機設計
-
-### 13.1 PlayerState
-
-```ts
-export type PlayerState =
-  | "idle"
-  | "run"
-  | "jump"
-  | "fall"
-  | "double_jump"
-  | "dash"
-  | "wall_slide"
-  | "wall_jump"
-  | "dead";
-```
-
-### 13.2 狀態切換重點
-
-- dash 優先級高於一般移動
-- dead 最高優先級
-- wall_slide 只在空中且貼牆時成立
-- coyote jump 只在離地短時間內成立
-- jump buffer 只保存短時間輸入
-
----
-
-## 14. 建議專案架構
-
-```txt
-claude-platform-act-game/
-├─ public/
-│  └─ assets/
-│     ├─ sprites/
-│     ├─ tilesets/
-│     ├─ maps/
-│     └─ audio/
-├─ src/
-│  ├─ main.ts
-│  ├─ styles.css
-│  └─ game/
-│     ├─ config/
-│     │  └─ gameConfig.ts
-│     ├─ scenes/
-│     │  ├─ BootScene.ts
-│     │  ├─ MenuScene.ts
-│     │  ├─ GameScene.ts
-│     │  ├─ UIScene.ts
-│     │  └─ GameOverScene.ts
-│     ├─ entities/
-│     │  ├─ Player.ts
-│     │  ├─ Door.ts
-│     │  ├─ Switch.ts
-│     │  ├─ MovingPlatform.ts
-│     │  ├─ Checkpoint.ts
-│     │  └─ Hazard.ts
-│     ├─ systems/
-│     │  ├─ PlayerController.ts
-│     │  ├─ PlayerPhysics.ts
-│     │  ├─ AbilitySystem.ts
-│     │  ├─ CollisionSystem.ts
-│     │  ├─ LevelSystem.ts
-│     │  ├─ InteractionSystem.ts
-│     │  ├─ CheckpointSystem.ts
-│     │  ├─ CameraSystem.ts
-│     │  ├─ DebugOverlay.ts
-│     │  └─ GameState.ts
-│     ├─ data/
-│     │  ├─ playerPhysics.ts
-│     │  ├─ abilities.ts
-│     │  ├─ interactables.ts
-│     │  ├─ levels.ts
-│     │  └─ tiles.ts
-│     ├─ types/
-│     │  ├─ PlayerTypes.ts
-│     │  ├─ PhysicsTypes.ts
-│     │  ├─ AbilityTypes.ts
-│     │  ├─ LevelTypes.ts
-│     │  └─ GameTypes.ts
-│     └─ utils/
-│        ├─ units.ts
-│        ├─ math.ts
-│        ├─ debug.ts
-│        └─ validateData.ts
-├─ docs/
-│  ├─ ai-prompts-log.md
-│  ├─ playtest-report.md
-│  └─ tuning-notes.md
+```text
+precision-platformer/
 ├─ .github/
 │  └─ workflows/
-│     └─ deploy.yml
+│     └─ deploy.yml          # GitHub Actions → Pages（第 8 段）
+├─ public/                   # 不經打包的靜態檔
+├─ src/
+│  ├─ main.ts                # 進入點：建立 Phaser.Game
+│  ├─ config/
+│  │  ├─ GameConfig.ts       # Phaser GameConfig（解析度/Scale/物理）
+│  │  └─ Units.ts            # 單位系統常數（唯一的 px 換算處）
+│  ├─ scenes/
+│  │  ├─ BootScene.ts        # 啟動、Scale Manager 設定
+│  │  ├─ PreloadScene.ts     # 資源載入 + 進度條
+│  │  ├─ MenuScene.ts        # 主選單
+│  │  ├─ GameScene.ts        # 關卡主場景（地形/玩家/互動物）
+│  │  ├─ UIScene.ts          # 疊加 UI（計時器/提示），與 GameScene 平行運行
+│  │  └─ VictoryScene.ts     # 全破結算
+│  ├─ entities/
+│  │  └─ Player.ts           # 玩家狀態機：移動/跳躍/牆跳/衝刺（第 4 段）
+│  ├─ systems/
+│  │  ├─ InputManager.ts     # 輸入抽象層（鍵盤／手把）
+│  │  ├─ CameraController.ts # 相機跟隨與邊界
+│  │  ├─ CheckpointSystem.ts # 紀錄點與重生（第 5、6 段）
+│  │  └─ SaveData.ts         # localStorage 薄封裝（unlockedLevel/bestTimes）
+│  ├─ levels/
+│  │  └─ level-01.json       # 資料驅動關卡（第 7 段）
+│  ├─ types/
+│  │  └─ level.ts            # 關卡資料的 TS 型別定義
+│  └─ assets/                # 開發期佔位圖／音效（由 Vite import）
 ├─ index.html
-├─ package.json
 ├─ tsconfig.json
-├─ vite.config.ts
-└─ README.md
+├─ vite.config.ts            # base path 設定（第 8 段）
+└─ package.json
 ```
+
+### 2.4 系統模組劃分（職責邊界，SRP / DIP）
+
+| 層 | 職責 | 不該做的事 |
+| --- | --- | --- |
+| `config/` | 純常數與設定（單位、解析度、物理參數） | 不放邏輯 |
+| `scenes/` | 編排：載入資料 → 生成物件 → 接線 → 驅動更新 | 不放玩家移動細節 |
+| `entities/` | 物件自身行為（玩家狀態機、互動物狀態） | 不直接讀原始鍵盤、不管關卡載入 |
+| `systems/` | 可重用服務（輸入、相機、紀錄點、存檔） | 不綁死特定關卡或 Scene |
+| `levels/` + `types/` | 純資料 + 型別 | 不含執行邏輯 |
+
+- **DIP**：`Player` 依賴 `InputManager` 的抽象（「有沒有按跳」「水平軸值」），不直接碰 `this.input.keyboard`。日後加手把、改鍵位只動 `InputManager`。
+- **UIScene 平行運行**：HUD 獨立疊在 `GameScene` 上，死亡重建 `GameScene` 時不受影響。
+- **資料驅動**：`GameScene` 讀 `level-XX.json` 生成地形與互動物，引擎本體不認識「第幾關」。
+
+### 2.5 依賴清單（package.json 預期）
+
+```jsonc
+{
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "phaser": "^4.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.0",
+    "vite": "^8.1.0"
+  }
+}
+```
+
+> 套件管理器用 **npm**。
+
+### 2.6 本段決策（已定）
+
+- Phaser **4.1** + TypeScript **6.0**；第一版**鍵盤**（`InputManager` 預留手把）；物理引擎 **Arcade**。
 
 ---
 
-## 15. TypeScript 型別草案
+## 3. 座標、單位與縮放系統
 
-### 15.1 PhysicsTypes.ts
+### 3.1 座標系統定義
 
-```ts
-export interface PlayerPhysicsConfig {
-  maxRunSpeedUnit: number;
-  groundAccelerationUnit: number;
-  groundDecelerationUnit: number;
-  airAccelerationUnit: number;
-  airDecelerationUnit: number;
-  turnAccelerationUnit: number;
-  gravityUnit: number;
-  maxFallSpeedUnit: number;
-  jumpHeightUnit: number;
-  jumpVelocityUnit: number;
-  jumpCutMultiplier: number;
-  coyoteTimeMs: number;
-  jumpBufferMs: number;
-  apexGravityMultiplier: number;
-  fallGravityMultiplier: number;
-}
-```
+採 **Phaser 原生座標**，不做任何翻轉或自訂變換：
 
-### 15.2 AbilityTypes.ts
+- 原點 `(0, 0)` 在**左上角**；**X 向右為正**，**Y 向下為正**；重力方向 = Y 正向（向下）。
+- **不做 Y 翻轉**：整個專案只用一套座標系，地面 Y 值就是大、天空 Y 值就是小。消除轉換層，bug 也跟著消失。
+
+### 3.2 固定解析度與自動縮放
+
+- **1920 × 1080 是「邏輯解析度」＝相機視野大小，不是關卡世界大小。** 世界可遠大於視野，相機跟玩家捲動。
+- 所有遊戲邏輯永遠在固定的 1920×1080 邏輯空間運算，**程式碼永遠不碰實際裝置像素**。
+- 縮放用 Phaser Scale Manager 的 **FIT**：等比縮放鋪滿、維持 16:9，多出處留黑邊（letterbox），`CENTER_BOTH` 置中。
+
+#### `GameConfig.ts`（縮放與物理部分）
 
 ```ts
-export type AbilityId =
-  | "double_jump"
-  | "dash"
-  | "wall_slide"
-  | "wall_jump"
-  | "ground_pound";
+import Phaser from 'phaser';
+import { BASE_WIDTH, BASE_HEIGHT } from './Units';
 
-export interface AbilityState {
-  unlocked: Record<AbilityId, boolean>;
-  airJumpsUsed: number;
-  airDashesUsed: number;
-}
-```
-
-### 15.3 PlayerTypes.ts
-
-```ts
-export type PlayerState =
-  | "idle"
-  | "run"
-  | "jump"
-  | "fall"
-  | "double_jump"
-  | "dash"
-  | "wall_slide"
-  | "wall_jump"
-  | "dead";
-
-export interface PlayerStats {
-  // 無戰鬥版本：玩家無 HP，碰陷阱 / 掉落即死亡重生
-  // 僅保留統計用欄位（選配）
-  deaths: number;
-}
-```
-
-### 15.4 LevelTypes.ts
-
-```ts
-export type InteractableType =
-  | "key"
-  | "locked_door"
-  | "switch"
-  | "switch_door"
-  | "checkpoint"
-  | "ability_pickup"
-  | "goal";
-
-export interface LevelObjectConfig {
-  id: string;
-  type: InteractableType;
-  xUnit: number;
-  yUnit: number;
-  widthUnit?: number;
-  heightUnit?: number;
-  requiredKeyId?: string;
-  grantsAbilityId?: string;
-  targetId?: string;
-}
-```
-
----
-
-## 16. 資料檔草案
-
-### 16.1 playerPhysics.ts
-
-```ts
-import type { PlayerPhysicsConfig } from "../types/PhysicsTypes";
-
-export const PLAYER_PHYSICS: PlayerPhysicsConfig = {
-  maxRunSpeedUnit: 5.5,
-  groundAccelerationUnit: 35,
-  groundDecelerationUnit: 40,
-  airAccelerationUnit: 22,
-  airDecelerationUnit: 10,
-  turnAccelerationUnit: 50,
-  gravityUnit: 28,
-  maxFallSpeedUnit: 14,
-  jumpHeightUnit: 2.2,
-  jumpVelocityUnit: 11.1,
-  jumpCutMultiplier: 0.45,
-  coyoteTimeMs: 100,
-  jumpBufferMs: 120,
-  apexGravityMultiplier: 0.75,
-  fallGravityMultiplier: 1.25,
+export const GameConfig: Phaser.Types.Core.GameConfig = {
+  type: Phaser.AUTO,                 // 優先 WebGL，不支援才退回 Canvas
+  parent: 'game',                    // index.html 內的 <div id="game">
+  backgroundColor: '#1a1a1a',
+  scale: {
+    mode: Phaser.Scale.FIT,          // 等比縮放鋪滿、維持 16:9、留黑邊
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+    width: BASE_WIDTH,               // 邏輯寬永遠 1920
+    height: BASE_HEIGHT,             // 邏輯高永遠 1080
+  },
+  physics: {
+    default: 'arcade',
+    arcade: {
+      // gravity 等物理數值於第 4 段定義
+      debug: false,                  // 開發期可開 true 看碰撞框
+    },
+  },
+  // scene 陣列於第 6 段定義
 };
-
-export const DASH_CONFIG = {
-  dashDistanceUnit: 3,
-  dashDurationMs: 180,
-  dashCooldownMs: 400,
-  maxAirDashes: 1,
-} as const;
-
-export const WALL_CONFIG = {
-  wallSlideMaxFallSpeedUnit: 3.5,
-  wallStickMs: 80,
-  wallJumpXVelocityUnit: 6.5,
-  wallJumpYVelocityUnit: 10.5,
-  wallJumpLockMs: 120,
-} as const;
 ```
 
-### 16.2 abilities.ts
+### 3.3 單位系統（唯一換算來源）
+
+定義 **1 單位 (U) = 畫面高度的 10% = 1080 × 0.1 = 108 px**。全專案用「單位」表達設計數值，**只在 `Units.ts` 一處**轉成像素。
+
+#### `Units.ts`
 
 ```ts
-export const ABILITIES = [
-  {
-    id: "double_jump",
-    name: "Double Jump",
-    description: "Allows one additional jump while airborne.",
-  },
-  {
-    id: "dash",
-    name: "Air Dash",
-    description: "Dash horizontally or diagonally in midair.",
-  },
-  {
-    id: "wall_slide",
-    name: "Wall Slide",
-    description: "Slide down walls at reduced fall speed.",
-  },
-  {
-    id: "wall_jump",
-    name: "Wall Jump",
-    description: "Jump away from walls to climb vertical shafts.",
-  },
-] as const;
+/**
+ * 單位系統 — 全專案唯一的「單位 → 像素」換算來源。
+ * 位置、速度、加速度等設計數值一律以「單位 (U)」表達，只在此檔轉成像素。
+ */
+
+/** 基準邏輯解析度（＝相機視野大小，非世界大小）。 */
+export const BASE_WIDTH = 1920;
+export const BASE_HEIGHT = 1080;
+
+/** 1 單位 = 畫面高度的 10% = 108 px。 */
+export const UNIT = BASE_HEIGHT * 0.1; // 108
+
+/**
+ * 單位 → 像素。長度、速度 (U/s)、加速度 (U/s²) 共用同一乘數，
+ * 因為時間單位（秒）不變，換算只作用在「長度」維度。一個函式就夠。
+ */
+export const u = (units: number): number => units * UNIT;
+
+/** 視野尺寸（以單位計）：高 = 10 U，寬 ≈ 17.78 U。 */
+export const VIEW_W_UNITS = BASE_WIDTH / UNIT;  // ≈ 17.7778
+export const VIEW_H_UNITS = BASE_HEIGHT / UNIT; // = 10
 ```
+
+> `u(5)` = 540（px/s）、`u(30)` = 3240（px/s²）、`u(2)` = 216（px）。同一個 `u()` 通吃，因為秒不變、只換長度。
+
+### 3.4 世界座標與單位網格
+
+- 關卡世界座標一律以「單位」表達，存在關卡 JSON（第 7 段），載入時統一 `u()` 轉像素。
+- 地形/陷阱/互動物的位置與尺寸都用單位。例：平台 `{ x: 3, y: 8, w: 2, h: 1 }`（單位）→ 載入各 ×108 變像素。
+- **單位網格**作為設計對齊基準：建議地形對齊 `0.5 U`（54px）網格，但位置允許任意浮點（精準平台常需非整數落點）。
+
+### 3.5 換算速查表
+
+| 用途 | 設計值 | 乘數 | 像素值 |
+| --- | --- | --- | --- |
+| 位置／長度 | 1 U | ×108 | 108 px |
+| 位置／長度 | 2 U | ×108 | 216 px |
+| 速度 | 5 U/s | ×108 | 540 px/s |
+| 加速度 | 30 U/s² | ×108 | 3240 px/s² |
+| 視野高 | 10 U | ×108 | 1080 px |
+| 視野寬 | ≈17.78 U | ×108 | 1920 px |
+
+### 3.6 像素清晰度（待美術階段確認）
+
+開發期用純色方塊佔位，先不糾結。等美術風格定了再確認 `roundPixels`、`antialias` / `pixelArt` 兩組旗標（會影響移動觀感）。
+
+### 3.7 本段決策（已定）
+
+- 座標採 Phaser 原生（**Y 向下、不翻轉**）；設計網格 **0.5 U**（引擎不強制吸附）。
 
 ---
 
-# 17. Claude Code 執行總規則
+## 4. 玩家物理與手感規格
 
-Claude Code 每次執行任務時必須遵守以下規則。
+> **本段所有數值皆為「起始值」，不是定論。** 手感必須實際玩過用身體調。這裡給一套**內部自洽、可直接開跑**的起點。
 
-## 17.1 不可一次重寫整個專案
+### 4.1 設計總則
 
-每次只處理 SPEC 中指定 Phase。  
-不要在未被要求時重構無關檔案。
+1. **手感優先**：寧可花時間調這 30 個數字，不要急著加關卡。
+2. **速度控制自己接管**：Arcade 只做碰撞偵測與分離，加速/煞車/跳躍/衝刺全是自寫的速度設定。
+3. **單一接觸重置規則**：**接觸地面或牆面的瞬間，一律重置「二段跳次數、衝刺次數、coyote 計時」。** 不分地面/牆面寫兩套。
+4. **時間用 delta 累加計數**，不用 `setTimeout`、不用 Promise。所有計時器都是每幀 `counter -= dt` 倒數。
 
-## 17.2 每一階段都要先讀現有檔案
+### 4.2 玩家碰撞箱
 
-執行前先檢查：
+| 參數 | 單位值 | px 值 |
+| --- | --- | --- |
+| 寬 | 0.6 U | ≈ 65 px |
+| 高 | 0.9 U | ≈ 97 px |
 
-```bash
-ls
-find src -maxdepth 4 -type f
-cat package.json
+> 碰撞箱用 AABB（不旋轉）。視覺精靈可大於碰撞箱，碰撞以箱為準。
+
+### 4.3 水平移動
+
+| 參數 | 單位值 | px 值 | 說明 |
+| --- | --- | --- | --- |
+| 最大跑速 | **8 U/s** | 864 px/s | 手感第一號變數 |
+| 地面加速度 | 60 U/s² | 6480 px/s² | 約 0.13s 達速，跟手 |
+| 地面煞車（無輸入） | 70 U/s² | 7560 px/s² | 約 0.11s 全停，俐落 |
+| 空中加速度 | 40 U/s² | 4320 px/s² | 空中操控略弱 |
+| 空中阻力（無輸入） | 20 U/s² | 2160 px/s² | 空中保留動量、可控漂移 |
+| 轉向加速加成 | ×1.5 | — | 反向輸入時加速度×1.5，急停轉向更跟手 |
+
+### 4.4 跳躍與重力
+
+採**非對稱重力**（上升輕、下降重）＋**可變跳躍高度**。
+
+| 參數 | 單位值 | px 值 | 說明 |
+| --- | --- | --- | --- |
+| 起跳初速 | **17 U/s** | 1836 px/s | 約 2.9 U 高、上升 ~0.34s |
+| 上升重力 | **50 U/s²** | 5400 px/s² | 按住跳、上升中 |
+| 下降重力 | **80 U/s²** | 8640 px/s² | 1.6×，落下更俐落不飄 |
+| 可變跳躍截斷 | 夾到 6 U/s | 648 px/s | 上升中放開跳鍵→上升速度若 >6 則夾到 6 |
+| 終端速度（最大落速） | **22 U/s** | 2376 px/s | 落速上限，避免穿牆 |
+
+> 跳躍高度公式 `h = Vj² / (2 × G_up)`，`17² / (2×50) ≈ 2.89 U`。改跳躍高度只動起跳初速與上升重力。
+
+### 4.5 二段跳
+
+| 參數 | 值 | px 值 | 說明 |
+| --- | --- | --- | --- |
+| 二段跳初速 | 15 U/s | 1620 px/s | 略低於地面跳 |
+| 空中次數 | 1 次 | — | 由「單一接觸重置規則」重置（4.1.3） |
+
+### 4.6 牆滑與牆跳
+
+| 參數 | 值 | px 值 | 說明 |
+| --- | --- | --- | --- |
+| 觸發牆滑 | 空中 + 貼牆 + 水平輸入朝牆 | — | 三條件同時成立才進牆滑 |
+| 牆滑最大落速 | 6 U/s | 648 px/s | 貼牆下滑變慢，給反應時間 |
+| 牆跳水平初速 | 12 U/s | 1296 px/s | 推離牆面方向 |
+| 牆跳垂直初速 | 16 U/s | 1728 px/s | 向上 |
+| 牆跳輸入鎖 | 0.12 s | — | 牆跳後鎖水平輸入 0.12s，確保真的離牆、不會因玩家還按著朝牆而黏回去 |
+
+### 4.7 衝刺（Dash）
+
+| 參數 | 值 | px 值 | 說明 |
+| --- | --- | --- | --- |
+| 衝刺速度 | 20 U/s | 2160 px/s | 快速爆發位移 |
+| 衝刺持續 | 0.15 s | — | 位移距離 ≈ 3 U |
+| 衝刺方向 | 8 向 | — | 依輸入方向；無方向輸入則沿面向方向 |
+| 衝刺中重力 | 關閉 | — | 衝刺期間等速直線、不受重力 |
+| 衝刺結束速度 | 沿衝刺方向 8 U/s | 864 px/s | 結束時收斂，避免急停頓挫 |
+| 空中次數 | 1 次 | — | 由「單一接觸重置規則」重置 |
+
+> 衝刺採「接觸地/牆即重置、空中一次」（Celeste 式），**不採固定冷卻**。接觸重置讓關卡可預測，冷卻計時會引入「等 CD」的負面節奏。
+
+### 4.8 容錯機制
+
+| 機制 | 值 | px 值 | 說明 |
+| --- | --- | --- | --- |
+| Coyote time | 0.10 s | — | 離開地面邊緣後 0.10s 內仍可正常跳 |
+| Jump buffer | 0.12 s | — | 落地前 0.12s 內按跳，落地瞬間自動執行 |
+| 牆 coyote | 0.10 s | — | 離開牆面後 0.10s 內仍可牆跳 |
+| 轉角修正 | ≤ 0.25 U | ≈ 27 px | 上升頭部僅卡平台角 ≤0.25U 時水平微推滑過去，不硬撞停 |
+
+> 這四個數字決定「差一點點」會成功還是失敗，最需要實測微調。
+
+### 4.9 能力資源重置規則（統一）
+
+```text
+當玩家碰撞箱「接觸地面 或 接觸牆面」的當幀：
+  重置 二段跳次數 = 1
+  重置 衝刺次數   = 1
+  重置 coyote 計時器（離開時才開始倒數）
 ```
 
-必要時再讀相關檔案。
+不為地面、牆面各寫一套——一條規則、一個進入點。
 
-## 17.3 每一階段結束前都要執行驗收
+### 4.10 玩家狀態機
 
-優先執行：
-
-```bash
-npm run build
+```ts
+/** 玩家狀態。轉移條件見下表。 */
+export enum PlayerState {
+  Grounded,    // 站在地面
+  Airborne,    // 空中（含跳躍上升、自由落下）
+  WallSliding, // 貼牆下滑
+  Dashing,     // 衝刺中（覆蓋其他狀態，結束後回 Airborne/Grounded）
+}
 ```
 
-若有 lint 或 test script，也要執行：
+| 從 | 到 | 條件 |
+| --- | --- | --- |
+| Grounded | Airborne | 離開地面（跳躍或走出邊緣） |
+| Airborne | Grounded | 落地 |
+| Airborne | WallSliding | 貼牆 + 朝牆輸入 + 下落中 |
+| WallSliding | Airborne | 離牆 或 牆跳 |
+| 任意 | Dashing | 按衝刺 + 還有衝刺次數 |
+| Dashing | Airborne/Grounded | 衝刺持續結束，依當下是否觸地 |
 
-```bash
-npm run lint
-npm run test
-```
+> `Player.ts` 透過 `InputManager` 抽象拿輸入，不直接讀鍵盤（DIP）。
 
-若 script 不存在，回報 package.json 中實際可用 scripts。
+### 4.11 預設鍵位（第一版鍵盤）
 
-## 17.4 每一階段都要產出修改摘要
+| 動作 | 主鍵 | 備用鍵 |
+| --- | --- | --- |
+| 左右移動 | A / D | ← / → |
+| 跳躍 | Space | Z |
+| 衝刺 | Shift（左） | X |
+| 互動（開關／門） | E | ↑ |
 
-回覆格式：
+> 鍵位由 `InputManager` 集中管理，方便改鍵或接手把。
 
-```txt
-完成階段：Phase X - 階段名稱
+### 4.12 本段決策（已定）
 
-修改檔案：
-- path/to/fileA.ts：修改原因
-- path/to/fileB.ts：修改原因
-
-驗收結果：
-- npm run build：通過 / 未通過
-- 其他指令：通過 / 未執行，原因
-
-注意事項：
-- 尚未處理的問題
-- 下一階段建議
-```
-
-## 17.5 Git commit 原則
-
-每個 phase 完成後建議 commit 一次。
-
-Commit message 格式：
-
-```txt
-feat(platform): phase X - short description
-```
-
-或：
-
-```txt
-fix(platform): short bug fix description
-```
+- 最大跑速 **8 U/s** 起調；第一版做**核心四件**（移動＋跳＋二段跳＋牆跳），**衝刺排到 v0.5.0** 再加（見第 9 段）；**非對稱重力**（上升 50 / 下降 80）；衝刺**接觸重置、不用冷卻**。
 
 ---
 
-# 18. Claude Code 依序執行任務
+## 5. 關卡元素與互動系統
 
-以下每一個 Phase 都可以單獨貼給 Claude Code 執行。
+### 5.1 設計總則
+
+1. **全資料驅動**：每個互動物件都是關卡 JSON 裡的一筆資料。
+2. **接觸觸發為主**：互動盡量「跑過去就觸發」，少讓玩家停下來按鍵；需刻意操作的物件才用按鍵（逐物件可設）。
+3. **死亡只重置玩家，世界進度保留**（見 5.5）：重生＝瞬移回紀錄點、清速度與暫態，**已撿的鑰匙、已開的門、開關狀態都不還原**。
+4. **連動解耦**：開關不認識門的實作，只對一個 `targetId` 發事件；門自己訂閱（Observer，符合 LoD / DIP）。
+
+### 5.2 互動物件通用模型
+
+```ts
+/** 觸發方式：接觸即觸發 / 需按互動鍵。每個物件可獨立設定。 */
+export type TriggerMode = 'touch' | 'press';
+
+/** 互動物件共通介面。 */
+export interface Interactable {
+  readonly id: string;
+  /** 玩家碰撞箱與本物件重疊的當幀呼叫。 */
+  onOverlap(ctx: InteractionContext): void;
+  /** 玩家在範圍內按互動鍵時呼叫（trigger === 'press' 才會用到）。 */
+  onInteractPress?(ctx: InteractionContext): void;
+}
+```
+
+`InteractionContext` 提供玩家參考、關卡執行狀態（已撿鑰匙集合等）、與事件匯流排。
+
+### 5.3 連動系統（Observer）
+
+```text
+開關觸發  →  scene.events.emit('switch:' + targetId, isOn)
+門（lock 為 switch 型）  →  訂閱 'switch:' + 自己的 switchId，更新可通行狀態
+```
+
+- 開關**不** import 門、**不**直接呼叫門方法，只丟事件。
+- 一個開關可連動多個目標（多物件訂閱同一 `targetId`）。
+- 新增「被開關控制的物件型別」時，開關一行都不用改（OCP）。
+
+### 5.4 各元素規格
+
+#### 5.4.1 出生點與紀錄點
+
+| 項目 | 行為 |
+| --- | --- |
+| 出生點 | 關卡起始重生點（隱含的「紀錄點 0」），載入時玩家生於此。 |
+| 紀錄點 | 玩家碰撞箱通過即設為「當前重生點」，覆蓋先前的。 |
+| 觸發 | `touch`（通過即記錄）。 |
+| 狀態 | 未啟用 / 已啟用（視覺需明確區分）。 |
+
+#### 5.4.2 終點
+
+| 項目 | 行為 |
+| --- | --- |
+| 觸發 | `touch`，玩家碰到即通關。 |
+| 效果 | 結算本關 → 進下一關或勝利畫面（流程在第 6 段）。 |
+
+#### 5.4.3 陷阱與死亡平面
+
+| 項目 | 行為 |
+| --- | --- |
+| 陷阱 | 玩家碰撞箱與陷阱重疊 → **即死** → 回當前紀錄點。 |
+| 死亡平面 | 玩家落出世界下邊界（或關卡定義的死亡區）→ 同樣即死回紀錄點。 |
+| 觸發 | `touch`，無條件、無血量。 |
+
+> 死亡平面是必備保險：玩家掉出地圖一定要有東西接住並判死。
+
+#### 5.4.4 鑰匙
+
+| 項目 | 行為 |
+| --- | --- |
+| 觸發 | `touch`，碰到即收取。 |
+| 種類 | 以 `keyId`（顏色/種類）區分，對應同 `keyId` 的門。 |
+| 持有 | 收取後存進關卡執行狀態，**死亡不歸還**。 |
+
+#### 5.4.5 門
+
+| 項目 | 行為 |
+| --- | --- |
+| 鎖定條件 | 持有對應鑰匙 / 對應開關為開 / 無鎖（恆開）。 |
+| 上鎖時 | **實心、擋路**。 |
+| 解鎖後 | 依 `trigger`：`touch`＝接觸自動開、`press`＝按互動鍵開。 |
+| 開啟後 | 可通行，**永久保持開啟**（死亡不還原）。 |
+
+```ts
+type DoorLock =
+  | { kind: 'key'; keyId: string }       // 需持有對應鑰匙
+  | { kind: 'switch'; switchId: string } // 需對應開關為開
+  | { kind: 'none' };                    // 恆開
+```
+
+#### 5.4.6 開關
+
+| 模式 (`mode`) | 行為 |
+| --- | --- |
+| `once` | 觸發一次後**永久開啟**，不可關。 |
+| `toggle` | 每次觸發切換 開/關。 |
+| `hold` | 僅在持續接觸/站立時為開，離開即關。 |
+
+| 項目 | 行為 |
+| --- | --- |
+| 觸發 | 依 `trigger`：`touch`（跑過/踩上）或 `press`（按互動鍵）。 |
+| 連動 | 觸發時對 `targetId` 發事件，控制門等目標。 |
+
+### 5.5 死亡與重生：重置範圍
+
+| 死亡時重置 | 死亡時保留 |
+| --- | --- |
+| 玩家位置 → 當前紀錄點 | 已收取的鑰匙 |
+| 玩家速度 → 0 | 已開啟的門 |
+| 二段跳／衝刺次數、coyote／buffer 計時 | 開關狀態（`once`/`toggle` 維持） |
+| 衝刺中等暫態狀態 | 當前紀錄點 |
+| | 關卡計時器（**繼續累計，不歸零**——死亡是成績的一部分） |
+
+> 計時器只有「重新開始整關」才歸零；死亡重生不重置。速通慣例：死越多花越久，計時誠實反映。
+
+### 5.6 本段決策（已定）
+
+- **死亡只重置玩家**（世界進度保留）；開關預設 **`touch`**；**第一版不做移動平台**（要加時當「開關的 target」，架構已預留）；開關先支援 **`once` + `toggle`**（`hold` 後加）。
 
 ---
 
-## Phase 0：建立或檢查 FHD Phaser 專案底座
+## 6. 場景與狀態管理
 
-### AI TASK 00
+### 6.1 Scene 劃分與職責
 
-```txt
-你是本專案的 AI coding agent。請先檢查目前 repository 狀態。
+| Scene | 職責 | 不該做的事 |
+| --- | --- | --- |
+| `BootScene` | 最早啟動，確認 Scale 設定、載入進度條本身的極小資源 | 不載入遊戲資源 |
+| `PreloadScene` | 載入全部資源、顯示進度條，完成後進選單 | 不含遊戲邏輯 |
+| `MenuScene` | 主選單（標題、開始） | 不含關卡邏輯 |
+| `GameScene` | 關卡主場景：載入資料 → 生成 → 驅動更新 → 死亡重生 | 不畫 HUD、不管存檔 UI |
+| `UIScene` | 疊加 HUD（計時器、提示、暫停），與 GameScene 平行運行 | 不碰玩家物理 |
+| `VictoryScene` | 全破結算畫面 | — |
 
-目標：
-1. 確認這是一個 Phaser + Vite + TypeScript 專案。
-2. 若專案尚未建立，請建立最小可運行的 Vite + TypeScript + Phaser 專案。
-3. 遊戲邏輯解析度固定為 1920×1080。
-4. 建立 src/game/config/gameConfig.ts，包含 GAME_WIDTH、GAME_HEIGHT、UNIT。
-5. 建立 src/game/utils/units.ts，提供 u(value) 與 pxToUnit(value)。
-6. Phaser scale 使用 FIT 與 CENTER_BOTH，以支援 PC / Mobile 自適應。
-7. 確保 package.json 至少有 dev、build、preview scripts。
-8. 確保 npm run build 可以成功。
+### 6.2 狀態管理策略
 
-限制：
-- 不要加入平台遊戲功能，這一步只處理專案底座與解析度設定。
-- 不要使用 960×540，必須使用 1920×1080。
-- 後續所有速度與距離都應以 unit 設計。
+- **跨場景全域狀態 → Phaser `registry`（DataManager）**：`currentLevel`、`unlockedLevel`、`bestTimes`。
+- **永久存檔 → `systems/SaveData.ts` 薄封裝 localStorage**：只存 `unlockedLevel`、`bestTimes`。
+- **關卡執行狀態 → `GameScene` 持有的 `LevelState`**：已撿鑰匙集合、開關狀態、當前紀錄點、關卡計時。隨「重開整關」重置，不進 registry。
 
-預期修改：
-- package.json
-- tsconfig.json
-- vite.config.ts
-- index.html
-- src/main.ts
-- src/styles.css
-- src/game/config/gameConfig.ts
-- src/game/utils/units.ts
+> **不用 Zustand**：那是 React UI 狀態用的；純 Phaser 遊戲的慣用容器是 Phaser 自己的 registry。日後若選單改用 React DOM，該層才用 Zustand。
 
-驗收：
-- npm install 或 npm ci 可執行
-- npm run build 成功
-- npm run dev 可啟動開發伺服器
-- Phaser game config 使用 1920×1080
+### 6.3 場景流程
+
+```mermaid
+flowchart LR
+  Boot[BootScene] --> Preload[PreloadScene]
+  Preload --> Menu[MenuScene]
+  Menu -->|開始| Game[GameScene]
+  Game -. 平行運行 .-> UI[UIScene]
+  Game -->|通關·非最終關·下一關| Game
+  Game -->|通關·最終關| Victory[VictoryScene]
+  Game -->|回選單| Menu
+  Victory --> Menu
 ```
 
-建議 commit：
+### 6.4 關卡載入流程
 
-```bash
-git add .
-git commit -m "chore(platform): phase 0 setup fhd phaser project"
+1. `init(data)`：接收關卡索引／id，寫入 registry `currentLevel`。
+2. 取得關卡資料：以 **Vite `import` 靜態載入**對應 `level-XX.json`（型別由 `types/level.ts` 約束）。
+3. `create()`：解析資料（座標 `u()` 換算）→ 建地形（Arcade 靜態 body）→ 建互動物（註冊 overlap 與事件訂閱）→ 出生點生成玩家 → 設世界邊界與死亡平面 → 設相機 → `scene.launch('UIScene')` 啟動 HUD 與計時器。
+4. `update(dt)`：玩家更新 → 互動檢查 → 相機 → 計時器累加 → 判定死亡／通關。
+
+### 6.5 死亡與重生流程（快、零等待）
+
+```text
+觸發死亡（碰陷阱 / 落出死亡平面）
+  → 狀態切到 Respawning（關閉輸入，避免轉場中誤操作）
+  → （可選）極短死亡特效 ~0.1s
+  → 淡出 ~0.1s
+  → 重置玩家（依 5.5：位置回當前紀錄點、速度歸零、能力與計時重置）
+  → 世界狀態不動（鑰匙/門/開關保留）
+  → 淡入 ~0.15s
+  → 狀態切回 Grounded/Airborne，恢復輸入
 ```
+
+- 轉場總長起始值約 **0.25–0.35s**，可調；寧短勿長。用 Phaser tween（可 `await tweenAsync(...)`），期間以 `Respawning` 旗標關閉輸入與物理推進，**不用 `setTimeout`**。
+- 計時器在死亡重生時**不歸零**。
+
+### 6.6 關卡完成與切換流程
+
+```text
+玩家碰到終點
+  → 停止計時器，取得本關用時
+  → 寫存檔：更新 bestTimes[該關]（若更快）、unlockedLevel（解鎖下一關）→ localStorage
+  → 淡出
+  → 非最終關：以下一關索引 restart GameScene
+  → 最終關：start VictoryScene（顯示總用時/各關時間）
+```
+
+### 6.7 相機（CameraController 起始值）
+
+| 參數 | 起始值 | 說明 |
+| --- | --- | --- |
+| 跟隨 | `startFollow(player)` | 跟隨玩家 |
+| 平滑 lerp | 0.12 | 輕微平滑，避免生硬瞬移（精準平台不宜過大，會讓判位失準） |
+| 邊界 | 關卡世界邊界 | `setBounds`，相機不超出關卡 |
+| 死區（deadzone） | 可選，初期不設 | 之後視手感再加 |
+
+### 6.8 暫停
+
+- `ESC` 切換暫停：`GameScene` 暫停物理與更新，`UIScene` 顯示暫停面板（繼續 / 重開本關 / 回選單）；暫停時計時器停止累加。
+
+### 6.9 本段決策（已定）
+
+- v1 **線性選單** + 簡單主選單；**做暫停選單**；關卡用 **Vite `import` 靜態載入**；死亡轉場 **0.3s** 起調。
 
 ---
 
-## Phase 1：建立 Scene 架構
+## 7. 關卡資料格式
 
-### AI TASK 01
+**`types/level.ts` 是唯一真相來源**，關卡 JSON 必須符合它，載入時編譯期就能擋型別錯。
 
-```txt
-請建立精準平台跳躍遊戲的基本 Scene 架構。
+### 7.1 座標錨點規約（單一規約）
 
-目標：
-1. 新增 BootScene、MenuScene、GameScene、UIScene、GameOverScene。
-2. BootScene 負責產生 placeholder texture。
-3. MenuScene 顯示標題與開始提示。
-4. GameScene 暫時顯示 FHD 背景、地面 placeholder、玩家 placeholder。
-5. UIScene 顯示 key count、能力狀態、死亡次數（選配）。
-6. GameOverScene 顯示通關結果（Clear）。
-7. main.ts 使用 Phaser.Game 啟動這些 scenes。
+- 所有座標、尺寸**一律以「單位 (U)」表達**，載入時統一經 `u()` 換算。
+- **矩形物件**（地形/陷阱/門/開關/紀錄點/終點）：`(x, y)` = AABB **左上角**，`w`/`h` = 寬高。一個規約通吃，載入器只有一條生成路徑。
+- **出生點**（spawn）：點位 `(x, y)` = 玩家碰撞箱（0.6×0.9 U）的左上角。
+- 配合 Y 向下：`y` 越大越靠下。一塊 `{y:10, h:2}` 的地，頂面在 `y=10`。
 
-限制：
-- 不要把所有邏輯塞在 main.ts。
-- Scene 應放在 src/game/scenes。
-- 遊戲尺寸使用 src/game/config/gameConfig.ts 統一管理。
-- 若沒有美術素材，請用 Phaser graphics 產生 placeholder texture。
+### 7.2 型別定義 `types/level.ts`
 
-驗收：
-- npm run build 成功
-- npm run dev 時能看到 MenuScene
-- 按 Enter 或 Space 可進入 GameScene
+```ts
+/** 矩形（單位）。(x, y) = 左上角。 */
+export interface URect { x: number; y: number; w: number; h: number; }
+/** 點位（單位）。(x, y) = 物件 AABB 左上角。 */
+export interface UPoint { x: number; y: number; }
+
+export type TriggerMode = 'touch' | 'press';
+export type SwitchMode = 'once' | 'toggle' | 'hold';
+
+/** 門的上鎖條件。switch 型的 switchId 必須等於某開關的 targetId（連動頻道）。 */
+export type DoorLock =
+  | { kind: 'key'; keyId: string }
+  | { kind: 'switch'; switchId: string }
+  | { kind: 'none' };
+
+export interface TerrainData extends URect { id?: string; }         // 實心可站立
+export interface TrapData extends URect { id: string; }             // 觸碰即死
+export interface CheckpointData extends URect { id: string; }       // 通過即設重生點
+export interface KeyItemData extends URect { id: string; keyId: string; } // keyId 對應門鎖
+export interface DoorData extends URect {                           // 上鎖實心、解鎖後依 trigger 開
+  id: string;
+  lock: DoorLock;
+  trigger?: TriggerMode; // 預設 'touch'
+}
+export interface SwitchData extends URect {                         // 觸發對 targetId 發事件
+  id: string;
+  targetId: string;      // 連動頻道 id
+  mode?: SwitchMode;      // 預設 'once'
+  trigger?: TriggerMode;  // 預設 'touch'
+}
+export interface GoalData extends URect { id: string; }             // 碰到即通關
+
+/** 一整關。 */
+export interface LevelData {
+  schema: 1;                  // 結構版本，便於日後演進
+  id: string;
+  name: string;
+  world: { w: number; h: number };   // 世界邊界（單位）
+  deathPlaneY?: number;       // 玩家 y 超過此值即死。預設 = world.h
+  spawn: UPoint;              // 玩家出生點
+  terrain: TerrainData[];
+  traps?: TrapData[];
+  checkpoints?: CheckpointData[];
+  keys?: KeyItemData[];
+  doors?: DoorData[];
+  switches?: SwitchData[];
+  goal: GoalData;             // 至少一個終點
+}
 ```
 
-建議 commit：
+### 7.3 載入時套用的預設值
 
-```bash
-git add .
-git commit -m "feat(platform): phase 1 add scene architecture"
+| 欄位 | 省略時預設 |
+| --- | --- |
+| `deathPlaneY` | `world.h`（世界底部即死亡平面） |
+| `door.trigger` | `'touch'` |
+| `switch.trigger` | `'touch'` |
+| `switch.mode` | `'once'` |
+| 各陣列（traps/keys/...） | 視為空陣列 |
+
+### 7.4 連動規約（開關 ↔ 門）
+
+- 開關用 `targetId` 當**連動頻道**，門用 `lock.switchId` 訂閱同一頻道。
+- **`switch.targetId` 必須等於 `door.lock.switchId`** 才會連動。
+- 物件自己的 `id` 是身分／除錯用；一個開關可驅動多扇門（多門 `switchId` 都指向同一 `targetId`）。
+
+### 7.5 範例 `level-01.json`
+
+```json
+{
+  "schema": 1,
+  "id": "level-01",
+  "name": "暖身：鑰匙與開關",
+  "world": { "w": 32, "h": 12 },
+  "spawn": { "x": 1, "y": 8.6 },
+  "terrain": [
+    { "id": "ground-a", "x": 0,  "y": 10, "w": 12, "h": 2 },
+    { "id": "plat-1",   "x": 14, "y": 9,  "w": 5,  "h": 1 },
+    { "id": "ground-b", "x": 20, "y": 10, "w": 12, "h": 2 }
+  ],
+  "traps": [
+    { "id": "spike-1", "x": 12, "y": 11.5, "w": 2, "h": 0.5 }
+  ],
+  "checkpoints": [
+    { "id": "cp-1", "x": 16, "y": 8, "w": 0.6, "h": 1 }
+  ],
+  "keys": [
+    { "id": "key-1", "x": 17.5, "y": 8.2, "w": 0.6, "h": 0.6, "keyId": "red" }
+  ],
+  "switches": [
+    { "id": "sw-1", "x": 22, "y": 9.5, "w": 1, "h": 0.5,
+      "targetId": "gate-A", "mode": "once", "trigger": "touch" }
+  ],
+  "doors": [
+    { "id": "door-key", "x": 19, "y": 8, "w": 1, "h": 2,
+      "lock": { "kind": "key", "keyId": "red" }, "trigger": "touch" },
+    { "id": "door-sw", "x": 26, "y": 8, "w": 1, "h": 2,
+      "lock": { "kind": "switch", "switchId": "gate-A" }, "trigger": "touch" }
+  ],
+  "goal": { "id": "goal-1", "x": 30, "y": 8, "w": 1, "h": 2 }
+}
 ```
+
+> 流程：出生 → 跳過尖刺斷層（掉下去碰 `spike-1` 即死回出生）→ 上平台踩 `cp-1` 紀錄 → 撿 `red` 鑰匙 → 開 `door-key` → 踩 `sw-1` 開 `door-sw`（連動頻道 `gate-A`）→ 抵達 `goal-1` 通關。
+
+### 7.6 編輯流程（v1：手寫 JSON）
+
+1. 複製範本 JSON，改 `id`／`name`。
+2. 在 **0.5U 網格**上填座標（1 U = 108px，畫面高 10U、寬 ≈17.78U）。
+3. 放進 `src/levels/`，在關卡索引登記、`import` 進來。
+4. `npm run dev` 開跑、實玩、調座標（改 JSON → Vite HMR 即時反映）。
+5. 開發期可開 `arcade.debug = true` 看碰撞框校位。
+
+> 視覺編輯器 / Tiled 匯入屬未來可選項，v1 手寫 JSON 足夠（KISS）。`schema` 版本欄位已預留，格式演進可平滑遷移。
+
+### 7.7 本段決策（已定）
+
+- 矩形物件 `(x,y)` = 左上角、spawn 為點位；**v1 矩形實心**（單向平台 `oneWay?` 列第一順位早期擴充、**不做斜坡**）；手寫 JSON。
 
 ---
 
-## Phase 2：建立資料、型別與物理參數
+## 8. 部署與 CI/CD
 
-### AI TASK 02
+目標：push 到 `main` → 自動建置 → 部署到 GitHub Pages，零手動步驟。
 
-```txt
-請建立精準平台跳躍專案的資料驅動架構。
+### 8.1 部署目標與路徑
 
-目標：
-1. 建立 PlayerTypes、PhysicsTypes、AbilityTypes、LevelTypes、GameTypes。
-2. 建立 playerPhysics.ts、abilities.ts、interactables.ts、levels.ts、tiles.ts。
-3. playerPhysics.ts 必須包含：
-   - maxRunSpeedUnit = 5.5
-   - groundAccelerationUnit = 35
-   - groundDecelerationUnit = 40
-   - airAccelerationUnit = 22
-   - gravityUnit = 28
-   - maxFallSpeedUnit = 14
-   - jumpHeightUnit = 2.2
-   - jumpVelocityUnit = 11.1
-   - coyoteTimeMs = 100
-   - jumpBufferMs = 120
-4. 建立 validateData.ts，檢查重要數值是否合理。
+- Repo：`CodingCatz/precision-platformer`（代號，正式名可改）。
+- Pages URL：`https://codingcatz.github.io/precision-platformer/`
+- 站台在子路徑 `/precision-platformer/` 下，**Vite `base` 必須對應設定**，否則資源 404、畫面空白。
 
-限制：
-- 資料檔使用 TypeScript export const，不使用外部 JSON。
-- 型別集中在 src/game/types。
-- data 集中在 src/game/data。
-- 不要在 GameScene 寫死物理數值。
+### 8.2 `vite.config.ts`（base path）
 
-驗收：
-- npm run build 成功
-- data 檔沒有 TypeScript 型別錯誤
-- validateData 可被 BootScene 或 GameScene 呼叫
+```ts
+import { defineConfig } from 'vite';
+
+export default defineConfig({
+  // GitHub Pages 專案站台子路徑，結尾斜線必留。repo 改名 → 這裡同步改。
+  base: '/precision-platformer/',
+});
 ```
 
-建議 commit：
+### 8.3 資源路徑注意事項（最常見的 Pages 部署坑）
 
-```bash
-git add .
-git commit -m "feat(platform): phase 2 add physics data configs"
-```
+- 資源一律用 **Vite `import`** 引入（例：`import playerPng from '../assets/player.png'`），讓 Vite 自動套 base，**不要**手寫 `'/assets/player.png'`。
+- 必要時用 `import.meta.env.BASE_URL` 取得 base 前綴。
+- Phaser loader 的 `load.image(key, url)` 的 url 也要走上述其一，不能寫死絕對根路徑。
 
----
+### 8.4 `.github/workflows/deploy.yml`
 
-## Phase 3：實作 Player 與基礎左右移動
-
-### AI TASK 03
-
-```txt
-請實作 Player entity 與基礎左右移動。
-
-目標：
-1. 建立 Player class。
-2. 建立 PlayerController class。
-3. 支援方向鍵與 A / D 左右移動。
-4. 速度使用 unit/s，再轉成 px/s。
-5. 支援加速度與減速度，不要瞬間切換速度。
-6. 玩家不可穿過地面。
-7. GameScene 使用 Player 與 PlayerController，不要直接在 GameScene 寫控制邏輯。
-
-限制：
-- Player 放在 src/game/entities/Player.ts。
-- PlayerController 放在 src/game/systems/PlayerController.ts。
-- 不要實作跳躍，跳躍留到 Phase 4。
-- 不要把 UI 邏輯放進 Player。
-
-驗收：
-- npm run build 成功
-- 玩家可左右移動
-- 玩家有加減速感
-- GameScene 沒有大量控制邏輯
-```
-
-建議 commit：
-
-```bash
-git add .
-git commit -m "feat(platform): phase 3 add player horizontal movement"
-```
-
----
-
-## Phase 4：實作跳躍、重力與可變跳高
-
-### AI TASK 04
-
-```txt
-請實作平台跳躍基礎手感。
-
-目標：
-1. 玩家可按 Space / W / 上方向鍵跳躍。
-2. 使用 gravityUnit = 28。
-3. 標準跳躍高度約 2.2 units。
-4. jumpVelocityUnit 約 11.1。
-5. 支援可變跳高：提早放開跳躍鍵會降低上升速度。
-6. 支援最大下落速度 maxFallSpeedUnit = 14。
-7. 下落時可使用 fallGravityMultiplier = 1.25。
-8. 跳躍頂點附近可使用 apexGravityMultiplier = 0.75。
-
-限制：
-- 物理數值從 playerPhysics.ts 讀取。
-- 不要把跳躍數值寫死在 PlayerController。
-- 不要實作二段跳，二段跳留到 Phase 6。
-
-驗收：
-- npm run build 成功
-- 玩家可跳躍
-- 短按與長按跳躍高度不同
-- 下落速度不會無限增加
-```
-
-建議 commit：
-
-```bash
-git add .
-git commit -m "feat(platform): phase 4 add jump physics"
-```
-
----
-
-## Phase 5：實作 Coyote Time 與 Jump Buffer
-
-### AI TASK 05
-
-```txt
-請改善跳躍容錯，加入 Coyote Time 與 Jump Buffer。
-
-目標：
-1. Coyote Time = 100ms。
-2. 玩家離開平台後 100ms 內仍可跳躍。
-3. Jump Buffer = 120ms。
-4. 玩家在落地前 120ms 按下跳躍，落地瞬間自動跳起。
-5. Debug overlay 或暫時 console 可檢查 coyote timer 與 jump buffer timer。
-
-限制：
-- 數值從 playerPhysics.ts 讀取。
-- 不要破壞 Phase 4 的可變跳高。
-- 不要實作二段跳。
-
-驗收：
-- npm run build 成功
-- 平台邊緣晚按跳躍仍能跳
-- 落地前預先按跳躍能接續跳
-- 短按 / 長按跳躍仍有效
-```
-
-建議 commit：
-
-```bash
-git add .
-git commit -m "feat(platform): phase 5 add coyote time and jump buffer"
-```
-
----
-
-## Phase 6：實作二段跳
-
-### AI TASK 06
-
-```txt
-請實作二段跳能力。
-
-目標：
-1. 建立 AbilitySystem。
-2. ability id 使用 double_jump。
-3. 玩家預設可以先開啟 double_jump，方便測試。
-4. 空中可再跳一次。
-5. 落地後重置 airJumpsUsed。
-6. UI 顯示 Double Jump 是否已解鎖。
-7. 之後要能透過 ability pickup 解鎖。
-
-限制：
-- AbilitySystem 放在 src/game/systems/AbilitySystem.ts。
-- 不要把 ability 狀態寫死在 Player。
-- 不要實作 Dash，Dash 留到 Phase 7。
-
-驗收：
-- npm run build 成功
-- 玩家可二段跳
-- 落地後可再次二段跳
-- UI 能顯示能力狀態
-```
-
-建議 commit：
-
-```bash
-git add .
-git commit -m "feat(platform): phase 6 add double jump ability"
-```
-
----
-
-## Phase 7：實作空中衝刺 Dash
-
-### AI TASK 07
-
-```txt
-請實作空中衝刺 Dash。
-
-目標：
-1. ability id 使用 dash。
-2. 玩家按 Shift / L / C 可 Dash。
-3. dashDistance = 3 units。
-4. dashDuration = 0.18s。
-5. dashSpeed 約 16.7 unit/s。
-6. Dash 方向依輸入方向決定。
-7. 沒有方向輸入時，依玩家面向方向 Dash。
-8. Dash 期間可暫時關閉或降低重力。
-9. 落地後重置 air dash。
-10. UI 顯示 Dash 是否可用。
-
-限制：
-- Dash 數值從 playerPhysics.ts 或 dash config 讀取。
-- Dash 不可讓玩家穿牆。
-- Dash 狀態應與 PlayerState 整合。
-
-驗收：
-- npm run build 成功
-- 玩家可 Dash
-- 空中 Dash 次數有限制
-- 落地後 Dash 重置
-- Dash 不會破壞跳躍與二段跳
-```
-
-建議 commit：
-
-```bash
-git add .
-git commit -m "feat(platform): phase 7 add air dash ability"
-```
-
----
-
-## Phase 8：實作牆滑與牆跳
-
-### AI TASK 08
-
-```txt
-請實作牆滑與牆跳。
-
-目標：
-1. ability id 使用 wall_slide 與 wall_jump。
-2. 玩家空中貼牆並下落時進入 wall_slide。
-3. wallSlideMaxFallSpeed = 3.5 unit/s。
-4. 玩家在 wall_slide 時按跳躍可 wall_jump。
-5. wallJumpXVelocity = 6.5 unit/s。
-6. wallJumpYVelocity = 10.5 unit/s。
-7. wallJumpLockMs = 120ms，避免立刻貼回牆面。
-8. UI 顯示 Wall Slide / Wall Jump 是否解鎖。
-
-限制：
-- 牆面判定需穩定，不要把地面誤判為牆。
-- 不要讓玩家無限貼牆上升。
-- 不要破壞二段跳與 Dash。
-
-驗收：
-- npm run build 成功
-- 玩家可沿牆下滑
-- 玩家可從牆跳開
-- 牆跳方向正確
-- 一般跳躍仍正常
-```
-
-建議 commit：
-
-```bash
-git add .
-git commit -m "feat(platform): phase 8 add wall slide and wall jump"
-```
-
----
-
-## Phase 9：建立 Tilemap / 關卡資料架構
-
-### AI TASK 09
-
-```txt
-請建立 Tilemap 與關卡資料架構。
-
-目標：
-1. 建立 LevelSystem。
-2. 建立 tiles.ts 與 levels.ts。
-3. 使用 0.5 unit = 54 px 作為 tile size。
-4. 建立一個 MVP 關卡，至少包含：
-   - 起點
-   - 地面平台
-   - 高低平台
-   - 一段需要二段跳的區域
-   - 一段需要 Dash 的缺口
-   - 一段需要牆跳的垂直區域
-   - 終點
-5. 若沒有 Tiled JSON，可先用 TypeScript array 生成簡易平台。
-
-限制：
-- 不要把平台座標全部寫死在 GameScene。
-- 關卡物件資料放在 levels.ts。
-- LevelSystem 負責建立地形與物件。
-
-驗收：
-- npm run build 成功
-- 關卡可遊玩
-- Camera bounds 正確
-- 玩家可站在平台上
-```
-
-建議 commit：
-
-```bash
-git add .
-git commit -m "feat(platform): phase 9 add tilemap level system"
-```
-
----
-
-## Phase 10：實作 CameraSystem
-
-### AI TASK 10
-
-```txt
-請實作 CameraSystem。
-
-目標：
-1. Camera 跟隨玩家。
-2. Camera 使用 world bounds。
-3. Camera 有平滑跟隨。
-4. 可設定 dead zone，若實作成本高可先保留 TODO。
-5. 玩家死亡或落地重擊時可呼叫 camera shake。
-
-限制：
-- CameraSystem 放在 src/game/systems/CameraSystem.ts。
-- 不要把 camera 設定散落在 GameScene 各處。
-- 不要讓鏡頭超出關卡邊界。
-
-驗收：
-- npm run build 成功
-- 鏡頭會跟隨玩家
-- 鏡頭不會超出世界邊界
-- 玩家死亡時可觸發輕微 shake
-```
-
-建議 commit：
-
-```bash
-git add .
-git commit -m "feat(platform): phase 10 add camera system"
-```
-
----
-
-## Phase 11：實作互動物件：鑰匙、門、開關
-
-### AI TASK 11
-
-```txt
-請實作基本探索互動物件。
-
-目標：
-1. 建立 InteractionSystem。
-2. 建立 Key、Door、Switch 或共用 Interactable entity。
-3. 玩家碰到 key 後取得 key count。
-4. locked door 需要 key 才能打開。
-5. switch 可切換 switch_door 狀態。
-6. UI 顯示 key count。
-7. 關卡中至少有一個 key door 與一個 switch door。
-
-限制：
-- 互動物件資料從 levels.ts 或 interactables.ts 讀取。
-- 不要在 GameScene 寫死 key / door 行為。
-- E 鍵可作為互動鍵；碰撞即拾取 key。
-
-驗收：
-- npm run build 成功
-- 玩家可取得 key
-- key door 可被打開
-- switch 可控制門或平台
-- UI key count 正確
-```
-
-建議 commit：
-
-```bash
-git add .
-git commit -m "feat(platform): phase 11 add keys doors and switches"
-```
-
----
-
-## Phase 12：實作 Checkpoint 與重生
-
-### AI TASK 12
-
-```txt
-請實作 Checkpoint 與死亡重生。
-
-目標：
-1. 建立 Checkpoint entity。
-2. 建立 CheckpointSystem。
-3. 玩家碰到 checkpoint 後啟用。
-4. 玩家掉落深淵或碰到 spike / saw 時回到最近 checkpoint。
-5. 重生後速度歸零、PlayerState 重置為 idle。
-6. checkpoint 啟用後有視覺變化。
-
-限制：
-- CheckpointSystem 放在 src/game/systems/CheckpointSystem.ts。
-- 不要讓 Player 自己管理所有重生邏輯。
-- 掉落判定使用 worldHeight + 3 units。
-
-驗收：
-- npm run build 成功
-- 玩家碰到 checkpoint 後可記錄位置
-- 掉落後回到 checkpoint
-- 重生後不會立即再死
-```
-
-建議 commit：
-
-```bash
-git add .
-git commit -m "feat(platform): phase 12 add checkpoints and respawn"
-```
-
----
-
-## Phase 13：實作陷阱與移動平台
-
-### AI TASK 13
-
-```txt
-請實作陷阱與移動平台。
-
-目標：
-1. 建立 Hazard entity。
-2. 支援 spike 與 pit。
-3. spike 接觸玩家造成傷害或重生。
-4. 建立 MovingPlatform entity。
-5. 移動平台支援兩點來回。
-6. 玩家站在移動平台上時需穩定跟隨平台移動。
-7. 關卡中加入至少一個 spike 區與一個 moving platform。
-
-限制：
-- MovingPlatform 放在 src/game/entities/MovingPlatform.ts。
-- Hazard 放在 src/game/entities/Hazard.ts。
-- 不要讓移動平台造成玩家抖動或穿透。
-
-驗收：
-- npm run build 成功
-- spike 可傷害玩家
-- pit 可讓玩家重生
-- 玩家可穩定站在 moving platform 上
-```
-
-建議 commit：
-
-```bash
-git add .
-git commit -m "feat(platform): phase 13 add hazards and moving platforms"
-```
-
----
-
-## Phase 14：抽出 CollisionSystem
-
-### AI TASK 14
-
-```txt
-請將碰撞邏輯抽出為 CollisionSystem。
-
-目標：
-1. 建立 CollisionSystem class。
-2. 集中處理：
-   - player vs ground
-   - player vs one-way platform
-   - player vs hazards（spike / saw → 死亡重生）
-   - player vs pit / 掉落深淵 → 死亡重生
-   - player vs pickups
-   - player vs doors / switches
-3. GameScene 只負責呼叫 CollisionSystem.update()。
-4. 碰撞事件發送：
-   - player:died
-   - player:respawn
-   - ability:unlocked
-   - key:changed
-   - door:opened
-
-限制：
-- CollisionSystem 放在 src/game/systems/CollisionSystem.ts。
-- 不要讓 UI 直接依賴 CollisionSystem。
-- 保持現有功能不退化。
-
-驗收：
-- npm run build 成功
-- 玩家移動與跳躍不退化
-- 互動物件正常
-- 碰陷阱 / 掉落會重生
-- GameScene 明顯變乾淨
-```
-
-建議 commit：
-
-```bash
-git add .
-git commit -m "refactor(platform): phase 14 extract collision system"
-```
-
----
-
-## Phase 15：實作能力拾取與探索門檻
-
-### AI TASK 15
-
-```txt
-請實作 ability pickup 與探索門檻。
-
-目標：
-1. 關卡中加入 ability pickup。
-2. 玩家取得 double_jump pickup 後才可二段跳。
-3. 玩家取得 dash pickup 後才可 Dash。
-4. 玩家取得 wall_slide / wall_jump pickup 後才可牆滑牆跳。
-5. 關卡路線設計需讓能力有實際用途：
-   - double_jump 區域
-   - dash 缺口
-   - wall_jump 垂直通道
-6. UI 顯示已解鎖能力。
-
-限制：
-- 不要預設全部能力都開啟，除了測試模式可用 debug flag。
-- AbilitySystem 管理能力狀態。
-- 關卡資料應能指定 grantsAbilityId。
-
-驗收：
-- npm run build 成功
-- 沒拿到能力前不能使用該能力
-- 拿到能力後立即可用
-- 關卡可用能力推進
-```
-
-建議 commit：
-
-```bash
-git add .
-git commit -m "feat(platform): phase 15 add ability pickups and gates"
-```
-
----
-
-## Phase 16：GameState 與通關流程
-
-### AI TASK 16
-
-```txt
-請整理 GameState 與完整遊戲流程。
-
-目標：
-1. 建立 GameState class 或 module。
-2. 管理：
-   - deaths（死亡次數，選配統計）
-   - keyCount
-   - unlockedAbilities
-   - checkpointId
-   - currentArea
-   - isVictory
-3. 玩家抵達 goal 後進入 GameOverScene 並顯示 Clear（可一併顯示死亡次數與耗時）。
-4. 本專案無 Game Over：玩家死亡一律重生到最近 checkpoint，不會淘汰。
-5. GameOverScene（通關畫面）可按 R 重新開始。
-6. 重新開始時清除舊事件 listener 與舊狀態。
-
-限制：
-- GameState 放在 src/game/systems/GameState.ts。
-- UI 不應直接修改 GameState，只接收事件或讀取 getter。
-- 不要破壞現有 Scene 流程。
-
-驗收：
-- npm run build 成功
-- 抵達終點會通關
-- 可重新開始遊戲
-- 重新開始後狀態正確
-```
-
-建議 commit：
-
-```bash
-git add .
-git commit -m "feat(platform): phase 16 add game state flow"
-```
-
----
-
-## Phase 17：Debug Overlay 與物理調參工具
-
-### AI TASK 17
-
-```txt
-請加入 Debug Overlay 與物理調參輔助。
-
-目標：
-1. 建立 DebugOverlay。
-2. 按 F3 開關。
-3. 顯示：
-   - player x/y unit
-   - velocityX / velocityY unit/s
-   - isGrounded
-   - isTouchingWall
-   - isWallSliding
-   - coyoteTimer
-   - jumpBufferTimer
-   - airJumpsUsed
-   - airDashesUsed
-   - current PlayerState
-   - FPS 或 frame time
-4. 可選：顯示 player collider、ground check、wall check、hazard 重疊判定。
-
-限制：
-- Debug overlay 預設關閉。
-- 不要引入重型 debug library。
-- 不要影響正式遊玩。
-
-驗收：
-- npm run build 成功
-- F3 可切換 debug overlay
-- Debug 資訊能幫助調整跳躍手感
-```
-
-建議 commit：
-
-```bash
-git add .
-git commit -m "feat(platform): phase 17 add physics debug overlay"
-```
-
----
-
-## Phase 18：視覺效果、動畫 placeholder、操作回饋
-
-### AI TASK 18
-
-```txt
-請加入最小視覺回饋與動畫 placeholder。
-
-目標：
-1. 玩家 idle / run / jump / fall / dash / wall_slide 有簡單視覺差異。
-2. 死亡時玩家有閃爍或碎裂效果，重生時有淡入。
-3. checkpoint 啟用時有亮起效果。
-4. ability pickup 有明顯圖示或光效。
-5. door 開啟、switch 觸發有視覺回饋。
-6. 若沒有音效檔，保留 audio hooks，但不要硬塞無效路徑造成錯誤。
-7. BootScene 產生必要 placeholder texture，避免缺圖錯誤。
-
-限制：
-- 不要引入大型外部素材。
-- 視覺效果應集中在 entity 或 effects helper。
-- 不要讓特效破壞核心 gameplay。
-
-驗收：
-- npm run build 成功
-- 主要狀態可用視覺區分
-- 沒有 missing texture error
-```
-
-建議 commit：
-
-```bash
-git add .
-git commit -m "feat(platform): phase 18 add visual feedback"
-```
-
----
-
-## Phase 19：Mobile 觸控操作選配
-
-### AI TASK 19
-
-```txt
-請加入簡易觸控操作作為選配功能。
-
-目標：
-1. 手機或平板可用虛擬左右按鈕移動。
-2. 可用觸控按鈕跳躍。
-3. 可用觸控按鈕 Dash。
-4. 可用觸控按鈕互動（E）。
-5. 桌機鍵盤操作維持不變。
-6. 觸控 UI 僅在 pointer/touch 環境或小螢幕顯示。
-7. 觸控 UI 不可遮擋主要遊戲畫面過多。
-
-限制：
-- 不要引入外部 UI framework。
-- 觸控控制可用 Phaser graphics 建立。
-- 不要破壞鍵盤操作。
-- 遊戲邏輯座標仍維持 FHD 1920×1080。
-
-驗收：
-- npm run build 成功
-- 桌機鍵盤可用
-- 觸控裝置可移動、跳躍、Dash、互動
-```
-
-建議 commit：
-
-```bash
-git add .
-git commit -m "feat(platform): phase 19 add mobile touch controls"
-```
-
----
-
-## Phase 20：GitHub Pages 自動部署
-
-### AI TASK 20
-
-```txt
-請加入 GitHub Pages 自動部署設定。
-
-目標：
-1. 新增 .github/workflows/deploy.yml。
-2. push 到 main 時自動執行 build。
-3. build 後部署 dist 到 GitHub Pages。
-4. vite.config.ts 設定正確 base path，支援 GitHub Pages repo path。
-5. README.md 補上部署說明。
-
-限制：
-- 不要使用需要額外 token 的第三方 deploy action。
-- 使用 GitHub 官方 Pages actions：
-  - actions/configure-pages
-  - actions/upload-pages-artifact
-  - actions/deploy-pages
-- workflow 要有正確 permissions：
-  - contents: read
-  - pages: write
-  - id-token: write
-
-預期修改：
-- .github/workflows/deploy.yml
-- vite.config.ts
-- README.md
-
-驗收：
-- npm run build 成功
-- workflow yaml 語法合理
-- dist 為部署目錄
-```
-
-### deploy.yml 建議內容
-
-```yml
-name: Deploy Game to GitHub Pages
+```yaml
+name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: ["main"]
-  workflow_dispatch:
+    branches: ['main']
+  workflow_dispatch:          # 允許從 Actions 分頁手動觸發
 
 permissions:
   contents: read
@@ -1831,319 +815,105 @@ permissions:
   id-token: write
 
 concurrency:
-  group: "pages"
-  cancel-in-progress: false
+  group: 'pages'
+  cancel-in-progress: true
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup Node
-        uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build game
-        run: npm run build
-
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload GitHub Pages artifact
-        uses: actions/upload-pages-artifact@v4
-        with:
-          path: ./dist
-
   deploy:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-
     runs-on: ubuntu-latest
-    needs: build
-
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22       # 對應第 2 段 Node 22 LTS
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci             # 用 package-lock.json，可重現安裝
+
+      - name: Build
+        run: npm run build      # tsc --noEmit && vite build
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist          # Vite 預設輸出目錄
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
 ```
 
-### vite.config.ts 建議設定
+> `npm ci` 需要 `package-lock.json` 進版控（不要 gitignore），CI 才能可重現安裝。
 
-```ts
-import { defineConfig } from "vite";
+### 8.5 一次性 repo 設定（手動，只做一次）
 
-export default defineConfig({
-  base: process.env.GITHUB_REPOSITORY
-    ? `/${process.env.GITHUB_REPOSITORY.split("/")[1]}/`
-    : "/",
-});
-```
+1. repo **Settings → Pages → Build and deployment → Source** 選 **「GitHub Actions」**（不是 branch 模式）。
+2. 確認預設分支為 `main`。
+3. 之後每次 push `main` 自動部署，Actions 分頁可看進度。
 
-建議 commit：
+### 8.6 單頁、無路由
 
-```bash
-git add .
-git commit -m "ci(platform): phase 20 deploy to github pages"
-```
+單一 canvas 遊戲，沒有前端路由，**不需要 404.html fallback、不需要 hash router**。
+
+### 8.7 部署管線的開發策略
+
+**v0.1.0 就先把這條管線打通**（部署一個空場景上 Pages），確認 base path 與資源路徑正確，再往上疊內容。先讓綠燈亮起來，別把部署坑累積到最後一起爆。
 
 ---
 
-## Phase 21：課程交付文件整理
+## 9. 開發里程碑與版本規劃
 
-### AI TASK 21
+### 9.1 版本規則
 
-```txt
-請整理本專案的課程交付文件。
+- `v0.X.0`：主要功能里程碑（下表）。`v0.X.Ya`：功能迭代（alpha）。`v0.X.Yb`：修復／優化（beta）。`v1.0.0`：正式發布。
+- 每次更新後寫 `CHANGELOG.md` → `git commit`，由開發者自行 push 並測試。
 
-目標：
-1. 更新 README.md。
-2. 新增 docs/ai-prompts-log.md。
-3. 新增 docs/playtest-report.md。
-4. 新增 docs/tuning-notes.md。
-5. README 需包含：
-   - 專案簡介
-   - FHD 1920×1080 與 unit 制說明
-   - 操作方式
-   - 玩家能力說明
-   - 開發指令
-   - 部署方式
-   - 遊戲系統摘要
-   - 已知問題
-6. ai-prompts-log.md 需提供學生可填寫的 prompt 紀錄表格。
-7. playtest-report.md 需提供測試紀錄格式。
-8. tuning-notes.md 需提供跳躍手感調整紀錄格式。
+### 9.2 里程碑總覽
 
-限制：
-- 不要把課程文件寫成廣告文。
-- 文件要適合學生交作業。
-- 不要假裝已經完成尚未完成的功能。
-- 內容需根據目前實際程式狀態撰寫。
+| 版本 | 里程碑 | 核心交付 |
+| --- | --- | --- |
+| v0.1.0 | 骨架＋縮放＋部署管線 | 固定 1920×1080 空場景上 Pages，CI/CD 綠燈 |
+| v0.2.0 | 移動與跳躍手感 | 跑/跳/可變跳躍/coyote/buffer/相機，手感可調 |
+| v0.3.0 | 二段跳＋牆滑牆跳 | 核心四件到齊，手感主體完成 |
+| v0.4.0 | 關卡系統＋互動＋完整迴圈 | 資料驅動生關、死亡重生、鑰匙/門/開關/終點、UI/選單/存檔，單關可全程通關 |
+| v0.5.0 | 衝刺＋內容擴充 | 衝刺、單向平台、多關卡與解鎖串接 |
+| v0.6.0 | 美術音效＋手感終調 | 換掉佔位、音效、轉場、數值最終校準 |
+| v1.0.0 | 正式發布 | 內容齊、手感定、bug 清、首批正式關卡 |
 
-驗收：
-- npm run build 成功
-- README 可讓新使用者知道如何執行專案
-- docs 文件可作為課程交付物
-```
+### 9.3 里程碑細節
 
-建議 commit：
+- **v0.1.0**：專案建立（Vite+TS+Phaser 4.1）、`GameConfig`（Scale FIT）、`Units.ts`、Boot/Preload 空殼、`vite.config.ts` base、`deploy.yml`。**先把部署打通**。建 `CHANGELOG.md`。交付：Pages 上看得到固定比例空場景。
+- **v0.2.0**：`InputManager`、`Player` 水平移動、跳躍（可變高度、非對稱重力、終端速度）、coyote/jump buffer、轉角修正、`CameraController`。狀態機 Grounded/Airborne。交付：能在地上跑跳、手感可調。
+- **v0.3.0**：二段跳、牆滑（限速）、牆跳（含輸入鎖）、牆 coyote、單一接觸重置規則、WallSliding 狀態。交付：核心四件到齊。
+- **v0.4.0**（最大一段，用 alpha 迭代切）：`types/level.ts`＋載入器；陷阱＋死亡平面＋死亡重生流程；紀錄點、鑰匙、門、開關、Observer 連動、終點；`LevelState`、`SaveData`、`UIScene` 計時器、`MenuScene`、通關切換、`VictoryScene`、暫停。`level-01.json` 可全程通關。交付：完整可玩迴圈（單關），純資料生成。
+- **v0.5.0**：衝刺（Dashing 狀態、8 向、接觸重置）；單向平台（schema 加 `oneWay`）；多關卡、關卡索引、解鎖流程。交付：完整能力組（含衝刺）、多關卡。
+- **v0.6.0**：換掉純色佔位、加音效、`roundPixels`/`antialias` 定案、轉場特效、手感數值最終校準。
+- **v1.0.0**：內容齊、手感定、bug 清、首批正式關卡，發布到 Pages。
 
-```bash
-git add .
-git commit -m "docs(platform): phase 21 add course deliverables"
-```
+### 9.4 手感調校貫穿全程
+
+第 4 段那 30 個數字，從 v0.2.0 有東西可玩就一路在調，到 v0.6.0 才定稿。**不要期待一次填對。** 每個里程碑都要實際玩、用身體感受、回頭修數值。
+
+### 9.5 本段決策（已定）
+
+- 里程碑切分與順序認可（**衝刺排 v0.5.0**）；v1.0.0 首批正式關卡數量目標待定（建議 **8–12 關**）。
 
 ---
 
-# 19. 最終驗收清單
+## 附錄：與 `course/` 教材的對應
 
-## 19.1 Resolution / Unit
+本規格是「**設計＝要做什麼**」；`course/`（[講稿](./course/01_課程講稿.md) + [網頁簡報](./course/slides-web/index.html)）是「**教學＝怎麼用 AI 一步步做出來**」。
 
-- [ ] 遊戲邏輯解析度為 1920×1080
-- [ ] 1 unit = 108 px
-- [ ] 所有速度以 unit/s 設計
-- [ ] PC / Mobile 顯示可自適應
-- [ ] UI 在 FHD 與縮放後仍可讀
-
-## 19.2 Player Movement
-
-- [ ] 玩家可左右移動
-- [ ] 移動有加速度與減速度
-- [ ] 玩家可跳躍
-- [ ] 短按 / 長按跳躍高度不同
-- [ ] 最大下落速度有效
-- [ ] Coyote Time 有效
-- [ ] Jump Buffer 有效
-- [ ] 二段跳有效
-- [ ] Dash 有效
-- [ ] 牆滑有效
-- [ ] 牆跳有效
-
-## 19.3 Level / Exploration
-
-- [ ] 有 Tilemap 或資料驅動平台關卡
-- [ ] 有起點與終點
-- [ ] 有高低平台
-- [ ] 有二段跳區域
-- [ ] 有 Dash 缺口
-- [ ] 有牆跳垂直區域
-- [ ] 有 key door
-- [ ] 有 switch door
-- [ ] 有 checkpoint
-- [ ] 有 spike / pit
-- [ ] 有 moving platform
-- [ ] 碰到 spike / saw 會死亡重生
-- [ ] 掉落深淵會死亡重生
-- [ ] 抵達終點即通關
-
-## 19.4 Debug / Engineering
-
-- [ ] `npm run build` 成功
-- [ ] GameScene 沒有過度肥大
-- [ ] PlayerController、PlayerPhysics、AbilitySystem、CollisionSystem 分工清楚
-- [ ] Debug overlay 可顯示關鍵物理狀態
-- [ ] 無 missing texture error
-- [ ] 重啟遊戲不會殘留舊 listener
-
-## 19.5 Git / Deploy
-
-- [ ] Git commit 至少 10 次以上
-- [ ] GitHub repository 可公開檢視
-- [ ] GitHub Pages 已啟用
-- [ ] GitHub Actions 可成功部署
-- [ ] README 有遊戲網址
-- [ ] docs 文件完整
-
----
-
-# 20. 給學生的 Claude Code 使用建議
-
-## 20.1 每次任務要小
-
-不建議說：
-
-```txt
-幫我做一款完整平台跳躍遊戲。
-```
-
-建議說：
-
-```txt
-請只完成 Phase 5：Coyote Time 與 Jump Buffer。
-不要修改關卡、UI。
-完成後執行 npm run build，並列出修改檔案。
-```
-
-## 20.2 每次修改後檢查 diff
-
-建議指令：
-
-```bash
-git diff
-npm run build
-npm run dev
-```
-
-## 20.3 Build 失敗修正 Prompt
-
-```txt
-npm run build 失敗，錯誤如下：
-
-[貼上錯誤訊息]
-
-請只修正這個 build error。
-不要重構無關檔案。
-修正後再次執行 npm run build。
-```
-
-## 20.4 跳躍手感錯誤修正 Prompt
-
-```txt
-目前跳躍手感不正確。
-
-問題：
-1. 短按跳躍和長按跳躍高度差異不明顯。
-2. 玩家下落時太慢。
-3. 平台邊緣跳躍太嚴格。
-
-請只檢查 PlayerController、PlayerPhysics 與 playerPhysics.ts。
-保留以下規格：
-- jumpHeightUnit 約 2.2
-- gravityUnit = 28
-- coyoteTimeMs = 100
-- jumpBufferMs = 120
-
-請不要修改關卡與 UI。
-```
-
-## 20.5 牆跳錯誤修正 Prompt
-
-```txt
-目前牆跳容易立刻貼回牆面，請修正。
-
-正確規則：
-1. wallJump 後水平速度應推離牆面。
-2. wallJumpLockMs = 120ms 內不要讓水平輸入立刻抵消推力。
-3. wall_slide 只能在空中且貼牆時發生。
-4. 不要讓玩家在地面時觸發 wall_slide。
-
-請只修改 PlayerController / AbilitySystem / collision checks。
-```
-
----
-
-# 21. 教師錄播建議切點
-
-| 影片 | 對應 Phase | 主題 | 建議片長 |
-|---|---|---|---:|
-| 1 | Phase 0–2 | FHD 專案底座、單位制、物理資料 | 30–45 分鐘 |
-| 2 | Phase 3–5 | 左右移動、跳躍、Coyote / Buffer | 60–75 分鐘 |
-| 3 | Phase 6–8 | 二段跳、Dash、牆滑牆跳 | 60–75 分鐘 |
-| 4 | Phase 9–10 | Tilemap / 關卡、Camera | 45–60 分鐘 |
-| 5 | Phase 11–13 | 鑰匙、門、開關、Checkpoint、陷阱 | 60–75 分鐘 |
-| 6 | Phase 14–16 | CollisionSystem、能力拾取門檻、GameState 通關流程 | 45–60 分鐘 |
-| 7 | Phase 17–19 | Debug overlay、視覺回饋、Mobile 控制 | 45–60 分鐘 |
-| 8 | Phase 20–21 | GitHub Pages 部署與交付文件 | 30–45 分鐘 |
-
-總錄播時數：約 7–9 小時。  
-學生實作時間：約 12–24 小時。
-
----
-
-# 22. 規則摘要
-
-```txt
-解析度：
-- 1920×1080
-- 1 unit = 10% 畫面高 = 108 px
-
-世界：
-- MVP World = 80 × 20 units
-- Tile size = 0.5 unit = 54 px
-
-玩家：
-- Visual = 0.7 × 1.0 units
-- Collider = 0.45 × 0.85 units
-- maxRunSpeed = 5.5 unit/s
-- gravity = 28 unit/s²
-- maxFallSpeed = 14 unit/s
-- jumpHeight = 2.2 units
-- jumpVelocity ≈ 11.1 unit/s
-- coyoteTime = 100ms
-- jumpBuffer = 120ms
-
-能力：
-- Double Jump：空中再跳一次
-- Dash：3 units / 0.18s
-- Wall Slide：最大下滑 3.5 unit/s
-- Wall Jump：x 6.5 unit/s, y 10.5 unit/s
-
-互動：
-- Key
-- Locked Door
-- Switch
-- Switch Door
-- Checkpoint
-- Spike
-- Pit
-- Moving Platform
-
-死亡與通關（無戰鬥）：
-- 無 HP、無敵人、無攻擊
-- 碰到 spike / saw 即死亡重生
-- 掉落深淵即死亡重生
-- 抵達 goal 即通關
-
-驗收：
-- npm run build 成功
-- 可部署 GitHub Pages
-- Debug overlay 可檢查物理狀態
-```
+- 教材的數值、關卡資料格式、玩法範圍**均依本規格**（已對齊：跑速 8、非對稱重力 50/80、起跳初速 17、衝刺 0.15s、`{x,y,w,h}` 左上角 Y 向下、無移動平台、無能力拾取、觸控為選配）。
+- 教材以「課」與「Phase」作為教學節奏，與本規格的 `v0.X.0` 里程碑是不同切法、互為補充。
+- 若教材與本規格有出入，**以本規格為準**。

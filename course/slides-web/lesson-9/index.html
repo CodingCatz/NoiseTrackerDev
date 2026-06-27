@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<!-- 第 9 課 上架 GitHub Pages 與課程交付（Phase 20–21）— html-slide-make 模板改製 -->
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第 9 課・上架 GitHub Pages 與課程交付</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700;900&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --stage-bg:#0a0a0f; --slide-bg:#0f1015;
+  --ink:#f5f5f7; --ink-dim:#9aa0aa;
+  --accent:#6c5ce7; --accent-2:#00d2d3;
+  --line:rgba(255,255,255,.12);
+  --font-head:"Space Grotesk","Noto Sans TC",sans-serif;
+  --font-body:"Noto Sans TC",sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden;background:var(--slide-bg);
+  font-family:var(--font-body);color:var(--ink);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+.deck-bg{position:absolute;inset:0;z-index:0;background:var(--slide-bg);background-size:cover;background-position:center;background-repeat:no-repeat;transition:background .45s var(--ease)}
+.deck-viewport{position:fixed;inset:0;overflow:hidden;background:var(--slide-bg);display:flex;align-items:center;justify-content:center}
+.deck-stage{position:relative;z-index:1;width:1920px;height:1080px;transform-origin:center center;flex:0 0 auto}
+.slide{position:absolute;inset:0;background:transparent;padding:110px 140px;display:flex;flex-direction:column;justify-content:center;
+  opacity:0;visibility:hidden;pointer-events:none;transition:opacity .5s var(--ease);overflow:hidden}
+.slide.active{opacity:1;visibility:visible;pointer-events:auto;z-index:1}
+.slide .reveal{opacity:0;transform:translateY(28px);transition:opacity .6s var(--ease),transform .6s var(--ease)}
+.slide.active .reveal{opacity:1;transform:none}
+.slide.active .reveal:nth-child(1){transition-delay:.05s}
+.slide.active .reveal:nth-child(2){transition-delay:.15s}
+.slide.active .reveal:nth-child(3){transition-delay:.25s}
+.slide.active .reveal:nth-child(4){transition-delay:.35s}
+.slide.active .reveal:nth-child(5){transition-delay:.45s}
+.slide.active .reveal:nth-child(6){transition-delay:.55s}
+
+.kicker{font-family:var(--font-head);font-size:26px;letter-spacing:.28em;text-transform:uppercase;color:var(--accent-2);margin-bottom:30px;font-weight:500}
+h1{font-family:var(--font-head);font-size:96px;line-height:1.06;font-weight:700;letter-spacing:-.02em;margin-bottom:34px}
+h2{font-family:var(--font-head);font-size:74px;line-height:1.1;font-weight:700;letter-spacing:-.01em;margin-bottom:36px}
+.lead{font-size:40px;line-height:1.5;color:var(--ink-dim);font-weight:300;max-width:1380px}
+.big-statement{font-size:90px;line-height:1.16;font-weight:300;letter-spacing:-.01em;max-width:1560px}
+.big-statement strong{font-weight:700;color:var(--accent-2)}
+.big-statement .dim{color:var(--ink-dim)}
+
+.phase-kick{font-family:var(--font-mono);font-size:34px;letter-spacing:.2em;color:var(--accent-2);margin-bottom:26px;font-weight:600}
+.phase-title{font-family:var(--font-head);font-size:88px;font-weight:700;letter-spacing:-.02em;line-height:1.05;margin-bottom:28px}
+
+ul.points{list-style:none;display:flex;flex-direction:column;gap:22px;margin-top:18px}
+ul.points li{font-size:38px;line-height:1.4;padding-left:54px;position:relative;max-width:1540px}
+ul.points li::before{content:"";position:absolute;left:0;top:17px;width:22px;height:4px;background:var(--accent);border-radius:2px}
+ul.points li b{color:var(--ink);font-weight:700}
+ul.points li span{color:var(--ink-dim);font-size:30px}
+ul.points li span.cmd{font-family:var(--font-mono);color:var(--accent-2);font-size:26px}
+ul.points.num{counter-reset:n}
+ul.points.num li::before{content:counter(n);counter-increment:n;background:none;width:auto;height:auto;top:1px;left:0;font-family:var(--font-head);font-weight:700;color:var(--accent-2);font-size:34px}
+ul.points.num li{padding-left:64px}
+
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:70px;align-items:stretch}
+.cols .card{border:1px solid var(--line);border-radius:18px;padding:44px 46px;background:rgba(255,255,255,.02);display:flex;flex-direction:column}
+.cols .card.bad{border-color:rgba(255,99,99,.32)}
+.cols .card.good{border-color:rgba(0,210,211,.4)}
+.cols .num{font-family:var(--font-head);font-size:22px;font-weight:700;letter-spacing:.1em;color:var(--accent-2);margin-bottom:16px}
+.cols .card.bad .num{color:#ff7b7b}
+.cols h3{font-family:var(--font-head);font-size:42px;margin-bottom:16px;color:var(--ink);line-height:1.12}
+.cols p{font-size:31px;line-height:1.5;color:var(--ink-dim)}
+
+/* 自動部署流程 */
+.flow{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:22px;align-items:center;margin-top:20px}
+.flow .box{border:1px solid var(--line);border-radius:18px;padding:42px 30px;background:rgba(255,255,255,.02);text-align:center}
+.flow .box .n{font-family:var(--font-head);color:var(--accent-2);font-size:22px;font-weight:700;margin-bottom:14px;letter-spacing:.1em}
+.flow .box h3{font-size:34px;color:var(--ink);font-family:var(--font-head);line-height:1.25;font-weight:700}
+.flow .arr{color:var(--accent);font-size:52px;font-weight:700;line-height:1}
+
+.prompt-card{background:rgba(108,92,231,.07);border:1px solid rgba(108,92,231,.42);border-radius:20px;padding:40px 46px;max-width:1600px}
+.prompt-card .you{font-family:var(--font-head);font-size:23px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent-2);margin-bottom:24px;display:flex;align-items:center;gap:12px}
+.prompt-card p{font-size:33px;line-height:1.56;margin:0;color:var(--ink)}
+.prompt-card .req{margin:18px 0;display:flex;flex-direction:column;gap:13px}
+.prompt-card .req span{position:relative;padding-left:38px;font-size:30px;line-height:1.42;color:var(--ink)}
+.prompt-card .req span::before{content:"";position:absolute;left:8px;top:14px;width:14px;height:14px;border-radius:50%;border:2px solid var(--accent-2)}
+.prompt-card .hi{color:var(--accent-2);font-weight:700}
+.prompt-card .end{color:var(--ink-dim);font-size:30px}
+.prompt-card .end b{color:var(--ink)}
+.code-label{font-family:var(--font-mono);font-size:24px;color:var(--accent-2);margin-bottom:14px;letter-spacing:.04em}
+.code-label.muted{color:var(--ink-dim)}
+
+.progress{position:fixed;left:0;bottom:0;height:5px;background:var(--accent);z-index:50;transition:width .4s var(--ease);box-shadow:0 0 18px var(--accent)}
+.counter{position:fixed;right:104px;bottom:34px;z-index:50;font-family:var(--font-head);font-size:22px;color:var(--ink-dim);letter-spacing:.1em;user-select:none}
+.counter b{color:var(--ink);font-weight:700}
+.edge-nav{position:fixed;top:0;bottom:0;width:7vw;min-width:76px;z-index:40;cursor:pointer;opacity:0;transition:opacity .4s var(--ease)}
+.edge-nav.left{left:0}.edge-nav.right{right:0}
+.edge-nav:hover,.edge-nav.hint{opacity:1}
+.edge-nav i{position:absolute;inset:0;pointer-events:none;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.edge-nav.left i{background:radial-gradient(ellipse 92% 44% at 0% 50%,rgba(108,92,231,.30),rgba(0,210,211,.10) 45%,transparent 72%);-webkit-mask-image:radial-gradient(ellipse 100% 48% at 0% 50%,#000 30%,transparent 75%);mask-image:radial-gradient(ellipse 100% 48% at 0% 50%,#000 30%,transparent 75%)}
+.edge-nav.right i{background:radial-gradient(ellipse 92% 44% at 100% 50%,rgba(108,92,231,.30),rgba(0,210,211,.10) 45%,transparent 72%);-webkit-mask-image:radial-gradient(ellipse 100% 48% at 100% 50%,#000 30%,transparent 75%);mask-image:radial-gradient(ellipse 100% 48% at 100% 50%,#000 30%,transparent 75%)}
+.edge-nav::after{content:"";position:absolute;top:50%;transform:translateY(-50%);height:46%;width:3px;border-radius:3px;background:linear-gradient(transparent,var(--accent),transparent);box-shadow:0 0 22px var(--accent)}
+.edge-nav.left::after{left:0}.edge-nav.right::after{right:0}
+.help-fab{position:fixed;right:36px;bottom:26px;z-index:55;width:46px;height:46px;border-radius:50%;border:1px solid var(--line);background:rgba(0,0,0,.35);color:var(--ink-dim);font-family:var(--font-head);font-size:22px;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:default;user-select:none;transition:.2s}
+.help-fab:hover{color:var(--accent-2);border-color:var(--accent-2);background:rgba(0,0,0,.55);box-shadow:0 0 18px rgba(0,210,211,.35)}
+.help-pop{position:fixed;right:36px;bottom:86px;z-index:55;width:430px;max-width:calc(100vw - 60px);background:rgba(10,11,17,.92);border:1px solid var(--line);border-radius:14px;padding:24px 28px;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:0 24px 60px rgba(0,0,0,.55);opacity:0;visibility:hidden;transform:translateY(8px);transition:opacity .3s var(--ease),transform .3s var(--ease),visibility .3s;pointer-events:none}
+.help-fab:hover+.help-pop,.help-pop.show{opacity:1;visibility:visible;transform:none}
+.help-pop h4{font-family:var(--font-head);font-size:19px;letter-spacing:.18em;color:var(--accent-2);margin-bottom:14px;text-transform:uppercase}
+.help-pop table{width:100%;border-collapse:collapse}
+.help-pop td{font-size:19px;color:var(--ink-dim);padding:5px 0;line-height:1.45}
+.help-pop td:first-child{width:190px;color:var(--ink)}
+.help-pop kbd{font-family:var(--font-mono);font-size:15px;border:1px solid var(--line);border-bottom-width:2px;border-radius:6px;padding:1px 8px;background:rgba(255,255,255,.06);color:var(--ink)}
+.grid-btn{position:fixed;left:36px;bottom:26px;z-index:50;width:46px;height:46px;border:1px solid var(--line);background:rgba(0,0,0,.35);color:var(--ink-dim);border-radius:10px;font-size:20px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:color .2s,border-color .2s,background .2s}
+.grid-btn:hover{color:var(--accent);border-color:var(--accent);background:rgba(0,0,0,.55)}
+.overview{position:fixed;inset:0;z-index:60;background:rgba(8,8,12,.97);display:none;padding:60px;overflow-y:auto}
+.overview.open{display:block}
+.overview-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:26px;max-width:1600px;margin:0 auto}
+.thumb{aspect-ratio:16/9;border:1px solid var(--line);border-radius:10px;overflow:hidden;cursor:pointer;position:relative;background:var(--slide-bg);transition:border-color .2s,transform .2s}
+.thumb:hover{border-color:var(--accent);transform:translateY(-4px)}
+.thumb-stage{position:absolute;top:0;left:0;width:1920px;height:1080px;transform-origin:top left;pointer-events:none}
+.thumb-stage .slide{transition:none!important}
+.thumb .t-num{position:absolute;left:10px;top:8px;z-index:3;font-family:var(--font-head);font-size:15px;color:var(--ink);background:rgba(0,0,0,.55);padding:2px 8px;border-radius:6px}
+@media (prefers-reduced-motion:reduce){.slide,.slide .reveal,.progress{transition:none!important}.slide .reveal{opacity:1;transform:none}}
+@media print{@page{size:1920px 1080px;margin:0}html,body{overflow:visible}.deck-viewport{position:static}.deck-bg{display:none!important}.deck-stage{transform:none!important;width:1920px;height:auto}.slide{position:relative;opacity:1!important;visibility:visible!important;page-break-after:always;height:1080px;background:var(--slide-bg)}.slide .reveal{opacity:1!important;transform:none!important}.progress,.counter,.overview,.grid-btn,.edge-nav,.help-fab,.help-pop{display:none!important}}
+</style>
+</head>
+<body>
+<div class="deck-viewport">
+  <div class="deck-bg" id="deckBg"></div>
+  <div class="deck-stage" id="stage">
+
+    <!-- 1 封面 -->
+    <section class="slide active">
+      <p class="kicker reveal">AI 協作開發實戰 · 第 9 課（最後一課）　|　Phase 20–21</p>
+      <h1 class="reveal">上架 GitHub Pages<br>與課程交付</h1>
+      <p class="lead reveal">兩件讓專案「對外存在」的事：設定自動部署、整理交付文件。做完，你就有一個公開網址了。</p>
+    </section>
+
+    <!-- 2 大字主張 -->
+    <section class="slide" data-bg="radial-gradient(circle at 26% 30%,#241a5e,#0a0a0f 70%)">
+      <p class="big-statement reveal">把它送上網路，<br>讓<strong>全世界</strong>都能玩。</p>
+    </section>
+
+    <!-- 3 Phase 20 分隔 -->
+    <section class="slide" data-bg="linear-gradient(120deg,#1a1640,#0a0a0f 65%)">
+      <p class="phase-kick reveal">PHASE 20</p>
+      <h2 class="phase-title reveal">自動部署</h2>
+      <p class="lead reveal">推一次程式碼，網站就自動更新——你不用手動做任何事。</p>
+    </section>
+
+    <!-- 4 Phase 20 白話卡 -->
+    <section class="slide">
+      <p class="code-label muted reveal">▍你對 AI 說</p>
+      <div class="prompt-card reveal">
+        <span class="you">💬 你對 AI 說</span>
+        <p>幫我設定<span class="hi">自動部署到 GitHub Pages</span>：之後我只要把程式碼推上 GitHub，網站就自動重新打包、自動更新上線。</p>
+        <div class="req">
+          <span>請用 GitHub 官方的 Pages 功能來做</span>
+          <span>注意：Pages 網址會多一層專案名稱的路徑，請把專案設定調對，免得上線後變白畫面、圖載不出來</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5 自動部署流程 -->
+    <section class="slide">
+      <p class="kicker reveal">自動部署是什麼</p>
+      <h2 class="reveal" style="font-size:62px;margin-bottom:20px">設定一次，以後全自動</h2>
+      <div class="flow reveal">
+        <div class="box"><div class="n">① 你做</div><h3>push<br>程式碼</h3></div>
+        <div class="arr">→</div>
+        <div class="box"><div class="n">② 自動</div><h3>GitHub<br>幫你打包</h3></div>
+        <div class="arr">→</div>
+        <div class="box"><div class="n">③ 自動</div><h3>網站<br>更新上線</h3></div>
+      </div>
+      <p class="lead reveal" style="font-size:32px;margin-top:34px">這套機制叫 GitHub Actions。設定好一次，以後每次更新都自動上線——你只管寫程式。</p>
+    </section>
+
+    <!-- 6 base path 坑 -->
+    <section class="slide">
+      <h2 class="reveal">新手一定會踩的坑：白畫面</h2>
+      <div class="cols">
+        <div class="card bad reveal">
+          <div class="num">✕ 沒設對</div>
+          <h3>上線後一片白</h3>
+          <p>畫面全白、圖片全部載不出來。因為網址多了一層「專案名稱」，程式卻去舊路徑找資源。</p>
+        </div>
+        <div class="card good reveal">
+          <div class="num">✓ 設對了</div>
+          <h3>告訴它正確路徑</h3>
+          <p>讓專案知道「網址多了一層專案名稱」，所有圖片、程式就都找得到了。</p>
+        </div>
+      </div>
+      <p class="lead reveal" style="font-size:30px;margin-top:30px">規格裡那段「自動抓專案名稱」的設定，就是替你避開這個坑。</p>
+    </section>
+
+    <!-- 7 實際上線四步 -->
+    <section class="slide">
+      <p class="kicker reveal">把開關打開</p>
+      <h2 class="reveal">四步，正式上線</h2>
+      <ul class="points num">
+        <li class="reveal">把程式碼推上 GitHub　<span class="cmd">git add . → git commit → git push</span></li>
+        <li class="reveal">倉庫 <b>Settings → Pages → Source</b>　<span>選「GitHub Actions」</span></li>
+        <li class="reveal">回 <b>Actions</b> 分頁，等流程跑完　<span>看到綠色的勾</span></li>
+        <li class="reveal">點開網址　<span>你的遊戲，全世界都能玩</span></li>
+      </ul>
+    </section>
+
+    <!-- 8 大字 綠勾 -->
+    <section class="slide" data-bg="radial-gradient(circle at 72% 34%,#063b3a,#0a0a0f 70%)">
+      <p class="big-statement reveal">看到綠勾，點開網址——<br>你的遊戲<strong>上線了</strong>。</p>
+      <p class="lead reveal" style="margin-top:36px">把這個網址記下來，等一下寫進 README，然後分享出去。</p>
+    </section>
+
+    <!-- 9 Phase 21 分隔 -->
+    <section class="slide" data-bg="linear-gradient(120deg,#06302f,#0a0a0f 65%)">
+      <p class="phase-kick reveal">PHASE 21</p>
+      <h2 class="phase-title reveal">課程交付文件</h2>
+      <p class="lead reveal">讓任何人——包括未來的你——一打開專案就知道這是什麼、怎麼跑。</p>
+    </section>
+
+    <!-- 10 Phase 21 白話卡 -->
+    <section class="slide">
+      <p class="code-label muted reveal">▍你對 AI 說</p>
+      <div class="prompt-card reveal">
+        <span class="you">💬 你對 AI 說</span>
+        <p>幫我整理這個專案的<span class="hi">交付文件</span>，讓人一打開就懂。</p>
+        <div class="req">
+          <span>更新 README：這是什麼遊戲、怎麼操作、有哪些能力、怎麼開發、怎麼部署、還有遊戲網址</span>
+          <span>建立三份紀錄表：我下過哪些指令、試玩測試紀錄、調手感的過程</span>
+        </div>
+        <p class="end">請照專案<b>真實的樣子</b>寫，不要寫成廣告、也別假裝做了還沒做的功能。</p>
+      </div>
+    </section>
+
+    <!-- 11 交付四件 -->
+    <section class="slide">
+      <p class="kicker reveal">你的課程交付物</p>
+      <h2 class="reveal">四份文件，交作業也用得上</h2>
+      <ul class="points">
+        <li class="reveal"><b>README</b>　<span>專案說明書：是什麼、怎麼玩、怎麼跑、網址在哪</span></li>
+        <li class="reveal"><b>指令紀錄</b>　<span>你這趟下過哪些指令——一本 AI 協作的「航海日誌」</span></li>
+        <li class="reveal"><b>試玩紀錄</b>　<span>玩過哪些、發現什麼問題</span></li>
+        <li class="reveal"><b>調校筆記</b>　<span>跳躍手感怎麼一步步調出來的</span></li>
+      </ul>
+    </section>
+
+    <!-- 12 帶走的是方法 -->
+    <section class="slide">
+      <p class="kicker reveal">你真正帶走的</p>
+      <h2 class="reveal">不是這款遊戲，是這套方法</h2>
+      <ul class="points">
+        <li class="reveal"><b>先寫規格</b>　<span>給 AI 一張看得懂的施工藍圖</span></li>
+        <li class="reveal"><b>把大象切成片</b>　<span>一次只做一件事</span></li>
+        <li class="reveal"><b>每一步都驗收</b>　<span>沒驗過的「完成」等於沒完成</span></li>
+        <li class="reveal"><b>隨時能退回</b>　<span>每步提交，錯了退得回去</span></li>
+      </ul>
+      <p class="lead reveal" style="font-size:31px;margin-top:26px">這套方法跟平台遊戲無關——它是你未來跟 AI 做<b style="color:var(--ink)">任何東西</b>的底層作業系統。</p>
+    </section>
+
+    <!-- 13 結尾 恭喜 -->
+    <section class="slide" data-bg="radial-gradient(circle at 30% 28%,#241a5e,#0a0a0f 62%)">
+      <h1 class="reveal" style="font-size:110px">恭喜你，<br>完成了。</h1>
+      <p class="lead reveal" style="font-size:42px;color:var(--ink)">你手上有一個能玩的遊戲、一個公開網址、一段完整的開發紀錄。</p>
+      <p class="lead reveal" style="margin-top:18px">現在，去把你的網址分享出去吧。</p>
+    </section>
+
+  </div>
+</div>
+
+<div class="progress" id="progress"></div>
+<button class="grid-btn" id="gridBtn" title="總覽縮圖牆 (O)" aria-label="總覽">▦</button>
+<div class="counter"><b id="cur">1</b> / <span id="total">1</span></div>
+<div class="edge-nav left" id="edgeL" aria-label="上一頁"><i></i></div>
+<div class="edge-nav right" id="edgeR" aria-label="下一頁"><i></i></div>
+<div class="help-fab" id="helpFab" aria-label="操作說明">?</div>
+<div class="help-pop" id="helpPop">
+  <h4>操作說明</h4>
+  <table>
+    <tr><td>點 左 / 右邊緣</td><td>上一頁 / 下一頁</td></tr>
+    <tr><td><kbd>&#8592;</kbd> <kbd>&#8594;</kbd> <kbd>Space</kbd></td><td>翻頁</td></tr>
+    <tr><td><kbd>&#8593;</kbd></td><td>回課程總覽</td></tr>
+    <tr><td><kbd>&#8595;</kbd> / <kbd>O</kbd></td><td>投影片總覽</td></tr>
+    <tr><td><kbd>F</kbd></td><td>全螢幕</td></tr>
+    <tr><td>數字 + <kbd>Enter</kbd></td><td>跳到指定頁</td></tr>
+  </table>
+</div>
+<div class="overview" id="overview"><div class="overview-grid" id="ovGrid"></div></div>
+
+<script>
+(function(){
+  const stage=document.getElementById('stage');
+  const slides=Array.from(document.querySelectorAll('.slide'));
+  const progress=document.getElementById('progress');
+  const curEl=document.getElementById('cur'), totalEl=document.getElementById('total');
+  const overview=document.getElementById('overview'), ovGrid=document.getElementById('ovGrid');
+  const deckBg=document.getElementById('deckBg');
+  let i=slides.findIndex(s=>s.classList.contains('active')); if(i<0)i=0;
+  let jumpBuf='';
+  const HUB_URL='../index.html';
+  totalEl.textContent=slides.length;
+  function fit(){const s=Math.min(window.innerWidth/1920,window.innerHeight/1080);stage.style.transform=`scale(${s})`;}
+  window.addEventListener('resize',()=>{fit();if(overview.classList.contains('open'))scaleThumbs();});
+  fit();
+  function go(n){n=Math.max(0,Math.min(slides.length-1,n));if(n===i)return;slides[i].classList.remove('active');i=n;slides[i].classList.add('active');render();}
+  const next=()=>go(i+1), prev=()=>go(i-1);
+  function render(){curEl.textContent=i+1;progress.style.width=((i+1)/slides.length*100)+'%';deckBg.style.background=slides[i].dataset.bg||'';}
+  document.addEventListener('keydown',e=>{
+    if(overview.classList.contains('open')&&e.key!=='o'&&e.key!=='O'&&e.key!=='Escape'&&e.key!=='ArrowDown')return;
+    switch(e.key){
+      case 'ArrowRight':case 'PageDown':case ' ':e.preventDefault();next();break;
+      case 'ArrowLeft':case 'PageUp':e.preventDefault();prev();break;
+      case 'ArrowUp':if(HUB_URL){e.preventDefault();location.href=HUB_URL;}break;
+      case 'ArrowDown':e.preventDefault();toggleOverview();break;
+      case 'Home':go(0);break; case 'End':go(slides.length-1);break;
+      case 'f':case 'F':if(!document.fullscreenElement)document.documentElement.requestFullscreen();else document.exitFullscreen();break;
+      case 'o':case 'O':toggleOverview();break;
+      case 'Escape':if(overview.classList.contains('open'))toggleOverview();break;
+      case 'Enter':if(jumpBuf){go(parseInt(jumpBuf,10)-1);jumpBuf='';}break;
+      default:if(e.key>='0'&&e.key<='9'){jumpBuf+=e.key;}
+    }
+  });
+  const edgeL=document.getElementById('edgeL'),edgeR=document.getElementById('edgeR');
+  edgeL.addEventListener('click',prev);edgeR.addEventListener('click',next);
+  edgeL.classList.add('hint');edgeR.classList.add('hint');
+  setTimeout(()=>{edgeL.classList.remove('hint');edgeR.classList.remove('hint');},2000);
+  const helpFab=document.getElementById('helpFab'),helpPop=document.getElementById('helpPop');
+  helpFab.addEventListener('click',e=>{e.stopPropagation();helpPop.classList.toggle('show');});
+  window.addEventListener('click',e=>{if(helpPop.classList.contains('show')&&!helpPop.contains(e.target))helpPop.classList.remove('show');});
+  let wheelLock=false;
+  window.addEventListener('wheel',e=>{if(wheelLock)return;if(Math.abs(e.deltaY)<20)return;wheelLock=true;(e.deltaY>0?next:prev)();setTimeout(()=>wheelLock=false,600);},{passive:true});
+  let tx=0;
+  window.addEventListener('touchstart',e=>tx=e.touches[0].clientX,{passive:true});
+  window.addEventListener('touchend',e=>{const dx=e.changedTouches[0].clientX-tx;if(Math.abs(dx)>60)(dx<0?next:prev)();},{passive:true});
+  function buildOverview(){slides.forEach((s,idx)=>{const card=document.createElement('div');card.className='thumb';if(s.dataset.bg)card.style.background=s.dataset.bg;const holder=document.createElement('div');holder.className='thumb-stage';const mini=s.cloneNode(true);mini.classList.add('active');mini.querySelectorAll('.reveal').forEach(r=>{r.style.opacity=1;r.style.transform='none';});holder.appendChild(mini);const num=document.createElement('div');num.className='t-num';num.textContent=idx+1;card.appendChild(holder);card.appendChild(num);card.addEventListener('click',()=>{toggleOverview();go(idx);});ovGrid.appendChild(card);});}
+  function scaleThumbs(){ovGrid.querySelectorAll('.thumb').forEach(card=>{const st=card.querySelector('.thumb-stage');if(st)st.style.transform=`scale(${card.clientWidth/1920})`;});}
+  function toggleOverview(){overview.classList.toggle('open');if(overview.classList.contains('open'))scaleThumbs();}
+  document.getElementById('gridBtn').addEventListener('click',toggleOverview);
+  buildOverview();render();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>用 AI 協作打造網頁遊戲並上架 GitHub Pages — 課程總覽</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700;900&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --slide-bg:#0f1015; --stage-bg:#0a0a0f;
+  --ink:#f5f5f7; --ink-dim:#9aa0aa;
+  --accent:#6c5ce7; --accent-2:#00d2d3;
+  --line:rgba(255,255,255,.12);
+  --font-head:"Space Grotesk","Noto Sans TC",sans-serif;
+  --font-body:"Noto Sans TC",sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,monospace;
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{min-height:100%;background:var(--slide-bg);color:var(--ink);
+  font-family:var(--font-body);-webkit-font-smoothing:antialiased}
+body{background:
+  radial-gradient(ellipse 70% 50% at 15% 0%,rgba(108,92,231,.18),transparent 60%),
+  radial-gradient(ellipse 60% 50% at 90% 100%,rgba(0,210,211,.12),transparent 55%),
+  var(--slide-bg);
+  padding:96px 8vw 120px;overflow-x:hidden}
+.wrap{max-width:1280px;margin:0 auto}
+
+header{margin-bottom:72px;max-width:1000px}
+.kicker{font-family:var(--font-head);font-size:18px;letter-spacing:.3em;text-transform:uppercase;
+  color:var(--accent-2);font-weight:500;margin-bottom:26px}
+h1{font-family:var(--font-head);font-size:72px;line-height:1.04;font-weight:700;
+  letter-spacing:-.02em;margin-bottom:28px}
+h1 span{color:var(--accent-2)}
+.sub{font-size:24px;line-height:1.6;color:var(--ink-dim);font-weight:300;max-width:820px}
+.meta{display:flex;gap:14px;flex-wrap:wrap;margin-top:34px}
+.chip{font-family:var(--font-mono);font-size:15px;color:var(--ink-dim);
+  border:1px solid var(--line);border-radius:8px;padding:7px 14px}
+.chip b{color:var(--ink);font-weight:600}
+
+.section-label{font-family:var(--font-head);font-size:16px;letter-spacing:.22em;text-transform:uppercase;
+  color:var(--ink-dim);margin:0 0 26px;display:flex;align-items:center;gap:16px}
+.section-label::after{content:"";flex:1;height:1px;background:var(--line)}
+
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:22px}
+.card{display:block;text-decoration:none;color:inherit;position:relative;
+  border:1px solid var(--line);border-radius:16px;padding:30px 32px;
+  background:rgba(255,255,255,.02);transition:.25s var(--ease);overflow:hidden}
+.card .no{font-family:var(--font-head);font-size:15px;font-weight:700;letter-spacing:.1em;
+  color:var(--accent-2);margin-bottom:14px}
+.card h3{font-family:var(--font-head);font-size:30px;font-weight:700;line-height:1.15;margin-bottom:12px}
+.card p{font-size:18px;line-height:1.55;color:var(--ink-dim)}
+.card .phase{font-family:var(--font-mono);font-size:14px;color:var(--ink-dim);margin-top:18px}
+.card.live{cursor:pointer}
+.card.live::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--accent)}
+.card.live:hover{border-color:var(--accent);transform:translateY(-5px);
+  box-shadow:0 24px 60px rgba(108,92,231,.22);background:rgba(108,92,231,.06)}
+.card.live .arrow{position:absolute;right:30px;top:30px;color:var(--accent);font-size:24px;
+  opacity:0;transform:translateX(-6px);transition:.25s var(--ease)}
+.card.live:hover .arrow{opacity:1;transform:none}
+.card.soon{opacity:.5}
+.card.soon .tag{position:absolute;right:26px;top:30px;font-family:var(--font-mono);font-size:13px;
+  color:var(--ink-dim);border:1px solid var(--line);border-radius:6px;padding:3px 9px}
+
+footer{margin-top:80px;padding-top:30px;border-top:1px solid var(--line);
+  font-size:16px;color:var(--ink-dim);line-height:1.7}
+footer code{font-family:var(--font-mono);font-size:14px;color:var(--ink);
+  background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:5px;padding:1px 7px}
+@media(max-width:820px){.grid{grid-template-columns:1fr}h1{font-size:48px}body{padding:64px 6vw 90px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="kicker">AI 協作開發 · 實戰課程</p>
+    <h1>從一個點子，<br>到一個<span>能分享的網址</span>。</h1>
+    <p class="sub">學會把想法寫成「AI 照著做就能完成」的規格，再用 AI 編碼助手一步步做出一款
+      FHD 2D 精準平台跳躍網頁遊戲，最後免費部署到 GitHub Pages、拿到屬於你的遊戲網址。</p>
+    <div class="meta">
+      <span class="chip"><b>10</b> 堂課</span>
+      <span class="chip">錄播 <b>7–9</b> 小時</span>
+      <span class="chip">實作 <b>12–24</b> 小時</span>
+      <span class="chip">零基礎可跟</span>
+    </div>
+  </header>
+
+  <p class="section-label">課程地圖</p>
+  <div class="grid">
+
+    <a class="card live" href="lesson-0/index.html">
+      <span class="arrow">→</span>
+      <div class="no">LESSON 00</div>
+      <h3>課程導論</h3>
+      <p>你會做出什麼、會帶走什麼，以及決定成敗的 AI 協作四心法。</p>
+      <div class="phase">心法篇</div>
+    </a>
+
+    <a class="card live" href="lesson-1/index.html">
+      <span class="arrow">→</span>
+      <div class="no">LESSON 01</div>
+      <h3>如何規劃一份「給 AI 執行」的規格</h3>
+      <p>把想法翻成 AI 看得懂的施工藍圖：七個區塊、拆解的藝術、從零生規格。</p>
+      <div class="phase">規劃篇 · 方法論</div>
+    </a>
+
+    <a class="card live" href="lesson-2/index.html">
+      <span class="arrow">→</span>
+      <div class="no">LESSON 02</div>
+      <h3>專案底座、單位制、物理資料</h3>
+      <p>把空殼建起來、把「尺」寫進程式、把物理數值整理成一份資料。</p>
+      <div class="phase">Phase 0–2</div>
+    </a>
+
+    <a class="card live" href="lesson-3/index.html">
+      <span class="arrow">→</span>
+      <div class="no">LESSON 03</div>
+      <h3>左右移動、跳躍、Coyote / Buffer</h3>
+      <p>把跳躍從「能用」調到「好用」，加上兩個隱形手感魔法。</p>
+      <div class="phase">Phase 3–5</div>
+    </a>
+
+    <a class="card live" href="lesson-4/index.html">
+      <span class="arrow">→</span>
+      <div class="no">LESSON 04</div>
+      <h3>二段跳、Dash、牆滑牆跳</h3>
+      <p>給角色一整套平台遊戲身手，並建立「能力系統」。</p>
+      <div class="phase">Phase 6–8</div>
+    </a>
+
+    <a class="card live" href="lesson-5/index.html">
+      <span class="arrow">→</span>
+      <div class="no">LESSON 05</div>
+      <h3>Tilemap 關卡、Camera</h3>
+      <p>用資料驅動蓋出一個世界，讓鏡頭跟拍卻不出邊界。</p>
+      <div class="phase">Phase 9–10</div>
+    </a>
+
+    <a class="card live" href="lesson-6/index.html">
+      <span class="arrow">→</span>
+      <div class="no">LESSON 06</div>
+      <h3>鑰匙門開關、Checkpoint、陷阱</h3>
+      <p>讓世界活起來：機關、存檔點、死亡重生與移動平台。</p>
+      <div class="phase">Phase 11–13</div>
+    </a>
+
+    <a class="card live" href="lesson-7/index.html">
+      <span class="arrow">→</span>
+      <div class="no">LESSON 07</div>
+      <h3>系統重構、能力門檻、通關流程</h3>
+      <p>第一次做「整理」：抽出碰撞系統、把能力變成關卡鑰匙、串起通關。</p>
+      <div class="phase">Phase 14–16</div>
+    </a>
+
+    <a class="card live" href="lesson-8/index.html">
+      <span class="arrow">→</span>
+      <div class="no">LESSON 08</div>
+      <h3>Debug overlay、視覺回饋、Mobile</h3>
+      <p>調手感的神器、看得出差別的回饋、讓手機也能玩。</p>
+      <div class="phase">Phase 17–19</div>
+    </a>
+
+    <a class="card live" href="lesson-9/index.html">
+      <span class="arrow">→</span>
+      <div class="no">LESSON 09</div>
+      <h3>上架 GitHub Pages 與課程交付</h3>
+      <p>設定自動部署，推一次程式碼網站就更新，拿到公開網址。</p>
+      <div class="phase">Phase 20–21</div>
+    </a>
+
+  </div>
+
+  <footer>
+    操作：點任一張「可進入」的課程卡開始播放。簡報內 <code>← →</code> 翻頁、<code>F</code> 全螢幕、<code>↑</code> 回到此總覽頁、<code>↓</code> 開縮圖總覽。<br>
+    全 10 課（第 0–9 課）已全部上線。
+  </footer>
+</div>
+</body>
+</html>
