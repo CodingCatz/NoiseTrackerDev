@@ -4,3 +4,9 @@ dist/
 *.local
 .env
 .vite/
+
+# Claude Code 本機工具設定（預覽伺服器等），不進版控
+.claude/
+
+# 壓縮輸出（簡報打包等），以原始檔為準
+*.zip
