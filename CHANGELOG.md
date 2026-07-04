@@ -5,6 +5,14 @@
 
 ## [Unreleased]
 
+### HUD／關卡調整
+
+- 能力改以圖示呈現（二段跳／衝刺／牆跳），未取得時變暗、取得後亮燈（白框全亮）。
+- 鑰匙改以白點顯示（數量 = keyCount）。
+- 移除玩家依狀態變色（`applyStateVisual`），玩家維持單一顏色。
+- 教學關卡二段跳高台由 3.5u 降為 3u（降一階 0.5u），略降嚴苛度；對應道具與 checkpoint 一併下移。
+- 備註：一格 tile = 0.5 unit = 54 px。
+
 ### Phase 18：視覺回饋與動畫 placeholder
 
 - 新增 `utils/effects.ts`（fadeIn／burst／pulseLoop／popOnce）與 `utils/sfx.ts`（音效掛勾，無音檔時安靜跳過、不硬塞無效路徑）。

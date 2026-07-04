@@ -89,8 +89,8 @@ export const TUTORIAL_LEVEL: LevelConfig = {
     // S1 起點地面（x0..20，地面高 y16）
     { xUnit: 0, yUnit: 16, wUnit: 20, hUnit: 4 },
 
-    // S2 二段跳關卡：懸空高台（頂端 y12.5，比地面高 3.5u；單跳到不了、需二段跳）
-    { xUnit: 14, yUnit: 12.5, wUnit: 6, hUnit: 0.5 }, // x14..20
+    // S2 二段跳關卡：懸空高台（頂端 y13，比地面高 3u；單跳到不了、需二段跳。已由 3.5u 降一階）
+    { xUnit: 14, yUnit: 13, wUnit: 6, hUnit: 0.5 }, // x14..20
 
     // S3 衝刺關卡：缺口 x20..26（6u，超出一般跳躍距離）後的落地平台
     { xUnit: 26, yUnit: 12.5, wUnit: 10, hUnit: 0.5 }, // x26..36
@@ -105,11 +105,11 @@ export const TUTORIAL_LEVEL: LevelConfig = {
   objects: [
     // checkpoints（失敗時就近重生）
     { id: "cp1", type: "checkpoint", xUnit: 11, yUnit: 16 },
-    { id: "cp2", type: "checkpoint", xUnit: 18, yUnit: 12.5 },
+    { id: "cp2", type: "checkpoint", xUnit: 18, yUnit: 13 },
     { id: "cp3", type: "checkpoint", xUnit: 34, yUnit: 12.5 },
     // 能力道具（圓形，撿到才解鎖）
     { id: "ap_dj", type: "ability_pickup", grantsAbilityId: "double_jump", xUnit: 8, yUnit: 15 },
-    { id: "ap_dash", type: "ability_pickup", grantsAbilityId: "dash", xUnit: 16, yUnit: 11.5 },
+    { id: "ap_dash", type: "ability_pickup", grantsAbilityId: "dash", xUnit: 16, yUnit: 12 },
     { id: "ap_wj", type: "ability_pickup", grantsAbilityId: "wall_jump", xUnit: 31, yUnit: 11.5 },
     // 終點
     { id: "goal1", type: "goal", xUnit: 47, yUnit: 3.5 },

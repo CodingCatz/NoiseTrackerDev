@@ -2,20 +2,6 @@ import Phaser from "phaser";
 import { TextureKeys } from "../config/sceneKeys";
 import { PLAYER_PHYSICS } from "../data/playerPhysics";
 import { u } from "../utils/units";
-import type { PlayerState } from "../types/PlayerTypes";
-
-/** 各 PlayerState 的顯示顏色（placeholder 視覺差異） */
-const STATE_TINT: Record<PlayerState, number> = {
-  idle: 0x4fa3ff,
-  run: 0x7dd0ff,
-  jump: 0xbfe6ff,
-  fall: 0xffc46b,
-  double_jump: 0xbfe6ff,
-  dash: 0xffffff,
-  wall_slide: 0x8affc0,
-  wall_jump: 0x8affc0,
-  dead: 0xff5a5a,
-};
 
 /**
  * Player entity：以 Arcade Physics sprite 呈現玩家。
@@ -43,11 +29,6 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   setFacing(dir: 1 | -1): void {
     this._facing = dir;
     this.setFlipX(dir === -1);
-  }
-
-  /** 依 PlayerState 套用視覺顏色（每幀呼叫） */
-  applyStateVisual(state: PlayerState): void {
-    this.setTintFill(STATE_TINT[state] ?? STATE_TINT.idle);
   }
 
   /** 是否踩在地面上 */

@@ -127,9 +127,6 @@ export class GameScene extends Phaser.Scene {
     if (!grounded) this.lastAirFallVy = body.velocity.y;
     this.wasGrounded = grounded;
 
-    // 依狀態套用玩家視覺
-    this.player.applyStateVisual(this.controller.currentState);
-
     this.debug.update(this.player, this.controller, this.abilities, this.game.loop.actualFps);
   }
 
