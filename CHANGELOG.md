@@ -5,6 +5,15 @@
 
 ## [Unreleased]
 
+### Phase 16：GameState 與通關流程
+
+- `GameState` 擴充為中央進度記錄：死亡次數、鑰匙數、已解鎖能力、目前存檔點 id、目前區域、是否通關，提供 `snapshot()` 一次查詢。
+- 終點改為實體 sensor（由 InteractionSystem 建立，LevelSystem 不再另畫標記）；抵達終點 → CollisionSystem 觸發 `onGoalReached` → 進入通關畫面。
+- GameOverScene 顯示 CLEAR + 死亡次數 + 耗時；按 R 重新開始直接重啟 GameScene。
+- 本專案無 Game Over：死亡只重生不淘汰（killPlayer 行為不變）。
+- 重來清乾淨：新 GameState／AbilitySystem 重置 registry，UIScene 於 SHUTDOWN 解除 registry 監聽（實測監聽數 0→1 不累積）。
+- checkpoint 啟用時一併記錄 `gameState.checkpointId`；G 鍵除錯導線改走與抵達終點相同的通關流程。
+
 ### Phase 15：能力拾取與教學關卡
 
 - 能力改為「撿到道具才解鎖」：移除 GameScene 的預設全開；二段跳／衝刺／牆跳皆由場上道具解鎖（牆跳一併給牆滑）。

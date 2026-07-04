@@ -25,6 +25,7 @@ export class InteractionSystem {
   readonly doors = new Map<string, Interactable>();
   readonly switches: SwitchEntry[] = [];
   readonly abilityPickups: AbilityPickup[] = [];
+  goal: Interactable | null = null;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -54,8 +55,11 @@ export class InteractionSystem {
             );
           }
           break;
+        case "goal":
+          this.goal = this.spawn(obj, u(1), u(1));
+          break;
         default:
-          break; // goal 由 LevelSystem 處理
+          break;
       }
     }
   }

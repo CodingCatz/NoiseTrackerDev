@@ -34,6 +34,8 @@ export interface CollisionRefs {
   deathY: number;
   /** 死亡時的實際處理（重生、計次、震動），由 GameScene 提供 */
   onPlayerDied: () => void;
+  /** 抵達終點時的處理（進入通關畫面），由 GameScene 提供 */
+  onGoalReached: () => void;
 }
 
 /**
@@ -87,6 +89,11 @@ export class CollisionSystem {
     for (const pickup of interactions.abilityPickups) {
       physics.add.overlap(player, pickup, () => this.pickupAbility(pickup));
     }
+
+    // 終點：碰到即通關
+    if (interactions.goal) {
+      physics.add.overlap(player, interactions.goal, () => this.refs.onGoalReached());
+    }
   }
 
   /** 每幀連續判斷：掉落深淵死亡、E 互動（開門／切換開關） */
@@ -128,6 +135,7 @@ export class CollisionSystem {
     cp.markActivated(0x7dffa8);
     // 重生點設在 checkpoint 上方一點，重生後落地站定
     this.refs.checkpoints.setCheckpoint(cp.x, cp.y - u(1));
+    this.refs.gameState.setCheckpoint(cp.objId);
     this.scene.events.emit(CollisionEvents.CheckpointActivated, cp.objId);
   }
 

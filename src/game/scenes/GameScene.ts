@@ -35,6 +35,8 @@ export class GameScene extends Phaser.Scene {
   private wasGrounded = false;
   /** 上一幀在空中的下落速度（px/s），落地時用來判定是否重擊 */
   private lastAirFallVy = 0;
+  /** 本次遊玩開始時間（ms），用於通關耗時 */
+  private startTime = 0;
 
   constructor() {
     super(SceneKeys.Game);
@@ -42,6 +44,7 @@ export class GameScene extends Phaser.Scene {
 
   create(): void {
     this.cameras.main.setBackgroundColor("#1a1a24");
+    this.startTime = this.time.now;
 
     const level = new LevelSystem().build(this, TUTORIAL_LEVEL);
 
@@ -50,6 +53,7 @@ export class GameScene extends Phaser.Scene {
 
     // 狀態與系統
     this.gameState = new GameState(this);
+    this.gameState.setArea(TUTORIAL_LEVEL.name);
     this.checkpoints = new CheckpointSystem(level.spawnPx);
 
     // 建立互動物件（僅建立，不含碰撞判斷）
@@ -77,6 +81,7 @@ export class GameScene extends Phaser.Scene {
       checkpoints: this.checkpoints,
       deathY: level.worldPx.height + u(3),
       onPlayerDied: () => this.killPlayer(),
+      onGoalReached: () => this.win(),
     });
 
     // 相機：平滑跟隨 + 死區 + 震動（世界邊界已由 LevelSystem 設定，相機自動夾在其中）
@@ -85,11 +90,8 @@ export class GameScene extends Phaser.Scene {
     // UI 以獨立 Scene 平行疊在遊戲畫面上方
     this.scene.launch(SceneKeys.UI);
 
-    // 臨時導線：按 G 模擬抵達終點通關（僅為驗證 Scene 流程，非正式玩法）
-    this.input.keyboard?.once("keydown-G", () => {
-      this.scene.stop(SceneKeys.UI);
-      this.scene.start(SceneKeys.GameOver);
-    });
+    // 除錯導線：按 G 直接觸發通關（走與抵達終點相同的流程）
+    this.input.keyboard?.once("keydown-G", () => this.win());
   }
 
   update(_time: number, delta: number): void {
@@ -115,12 +117,24 @@ export class GameScene extends Phaser.Scene {
     this.wasGrounded = grounded;
   }
 
-  /** 死亡：計次、震動並重生到最近 checkpoint */
+  /** 死亡：計次、震動並重生到最近 checkpoint（本專案無 Game Over，死亡只重生） */
   private killPlayer(): void {
     this.gameState.addDeath();
     this.camera.largeShake();
     this.checkpoints.respawn(this.player);
     this.lastAirFallVy = 0;
     this.wasGrounded = false;
+  }
+
+  /** 通關：進入通關畫面（Clear），帶入死亡次數與耗時 */
+  private win(): void {
+    if (this.gameState.isVictory) return; // 避免重複觸發
+    this.gameState.win();
+    const elapsedMs = this.time.now - this.startTime;
+    this.scene.stop(SceneKeys.UI);
+    this.scene.start(SceneKeys.GameOver, {
+      deaths: this.gameState.deaths,
+      elapsedMs,
+    });
   }
 }

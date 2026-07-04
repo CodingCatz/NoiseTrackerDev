@@ -1,7 +1,6 @@
 import Phaser from "phaser";
 import type { LevelConfig } from "../types/LevelTypes";
 import { TextureKeys } from "../config/sceneKeys";
-import { INTERACTABLE_META } from "../data/interactables";
 import { u } from "../utils/units";
 
 /** LevelSystem 建構關卡後回傳的結果 */
@@ -29,12 +28,7 @@ export class LevelSystem {
       this.createSolid(scene, u(s.xUnit), u(s.yUnit), u(s.wUnit), u(s.hUnit))
     );
 
-    // 終點標記（其餘互動物件由 InteractionSystem 建立）
-    for (const obj of level.objects) {
-      if (obj.type === "goal") {
-        this.createObjectMarker(scene, obj.type, u(obj.xUnit), u(obj.yUnit));
-      }
-    }
+    // 互動物件（含 goal）一律由 InteractionSystem 建立
 
     const worldW = u(level.worldWidthUnit);
     const worldH = u(level.worldHeightUnit);
@@ -76,17 +70,5 @@ export class LevelSystem {
     );
     scene.physics.add.existing(rect, true);
     return rect;
-  }
-
-  /** 建立物件的視覺 placeholder（1 unit 方塊，顏色依類型） */
-  private createObjectMarker(
-    scene: Phaser.Scene,
-    type: keyof typeof INTERACTABLE_META,
-    xPx: number,
-    yPx: number
-  ): void {
-    const meta = INTERACTABLE_META[type];
-    const size = u(1);
-    scene.add.rectangle(xPx, yPx, size, size, meta.color, 0.85).setOrigin(0, 0);
   }
 }
