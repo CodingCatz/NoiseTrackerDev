@@ -55,7 +55,8 @@ export class GameScene extends Phaser.Scene {
       // 錯落平台：x / 頂端高度 / 寬度（unit）
       this.createSolid(u(5), groundTop - u(2), u(3), u(0.5)),
       this.createSolid(u(9.5), groundTop - u(4), u(2.5), u(0.5)),
-      this.createSolid(u(13.5), groundTop - u(6), u(2), u(0.5)),
+      // 第三塊往下延伸成一道測試牆（寬 1 unit、由高處直抵地面），供牆滑／牆跳測試
+      this.createSolid(u(13.5), groundTop - u(6), u(1), u(6)),
     ];
     return solids;
   }
@@ -99,6 +100,8 @@ export class GameScene extends Phaser.Scene {
     this.abilities = new AbilitySystem(this);
     this.abilities.unlock("double_jump");
     this.abilities.unlock("dash");
+    this.abilities.unlock("wall_slide");
+    this.abilities.unlock("wall_jump");
 
     this.controller = new PlayerController(this, this.player, this.abilities);
   }

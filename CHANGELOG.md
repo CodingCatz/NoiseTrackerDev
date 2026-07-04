@@ -5,6 +5,15 @@
 
 ## [Unreleased]
 
+### Phase 8：牆滑與牆跳
+
+- PlayerController 重整跳躍／牆壁邏輯：`readWallSide` 以 `blocked.left/right` 判定貼牆，天生不把地板誤判成牆。
+- 牆滑：空中貼牆下落時將下落速度限制為 `wallSlideMaxFallSpeedUnit`（3.5 unit/s）。
+- 牆跳：往牆的反方向斜上跳開（`wallJumpXVelocityUnit` / `wallJumpYVelocityUnit`），並以 `wallJumpLockMs` 鎖定水平輸入避免黏回牆面。
+- 牆跳優先於一般跳躍並消耗該次輸入，未破壞二段跳與 Dash。
+- GameScene 第三塊平台往下延伸為測試牆；預設解鎖 `wall_slide` / `wall_jump`，UI 顯示。
+- 暴露 `isWallSliding` / `isTouchingWall` getter 供 Debug overlay。
+
 ### Phase 7：空中衝刺 Dash
 
 - PlayerController 加入 Dash（Shift / L / C）：方向依輸入（可斜向），無輸入則依面向；速度由 `dashDistanceUnit / dashDurationMs` 推導。
