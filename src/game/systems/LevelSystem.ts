@@ -29,9 +29,11 @@ export class LevelSystem {
       this.createSolid(scene, u(s.xUnit), u(s.yUnit), u(s.wUnit), u(s.hUnit))
     );
 
-    // 物件標記（Phase 9 僅視覺 placeholder，互動邏輯留待後續 Phase）
+    // 終點標記（其餘互動物件由 InteractionSystem 建立）
     for (const obj of level.objects) {
-      this.createObjectMarker(scene, obj.type, u(obj.xUnit), u(obj.yUnit));
+      if (obj.type === "goal") {
+        this.createObjectMarker(scene, obj.type, u(obj.xUnit), u(obj.yUnit));
+      }
     }
 
     const worldW = u(level.worldWidthUnit);

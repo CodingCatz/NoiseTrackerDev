@@ -5,20 +5,29 @@ import { PlayerController } from "../systems/PlayerController";
 import { AbilitySystem } from "../systems/AbilitySystem";
 import { LevelSystem } from "../systems/LevelSystem";
 import { CameraSystem } from "../systems/CameraSystem";
-import { MVP_LEVEL } from "../data/levels";
+import { GameState } from "../systems/GameState";
+import { CheckpointSystem } from "../systems/CheckpointSystem";
+import { InteractionSystem } from "../systems/InteractionSystem";
+import { TEST_LEVEL } from "../data/levels";
 import { CAMERA_CONFIG } from "../data/cameraConfig";
 import { u } from "../utils/units";
 
 /**
  * GameScene：組裝關卡、玩家與各系統並驅動控制器。
- * Phase 9 起地形由 LevelSystem 依 levels.ts 生成，取代先前的臨時測試平台；
- * 相機基本跟隨玩家（完整 CameraSystem 留待 Phase 10）。
+ * Phase 11/12 使用簡易測試關卡（TEST_LEVEL）驗證互動物件與 Checkpoint／重生。
+ * 正式關卡 MVP_LEVEL 保留待整合後切回。
  */
 export class GameScene extends Phaser.Scene {
   private player!: Player;
   private controller!: PlayerController;
   private abilities!: AbilitySystem;
   private camera!: CameraSystem;
+  private gameState!: GameState;
+  private checkpoints!: CheckpointSystem;
+  private interactions!: InteractionSystem;
+  /** 掉落深淵的死亡判定 y（px） */
+  private deathY = Number.MAX_SAFE_INTEGER;
+
   /** 上一幀是否在地面，用於偵測落地瞬間 */
   private wasGrounded = false;
   /** 上一幀在空中的下落速度（px/s），落地時用來判定是否重擊 */
@@ -31,12 +40,18 @@ export class GameScene extends Phaser.Scene {
   create(): void {
     this.cameras.main.setBackgroundColor("#1a1a24");
 
-    // 依資料生成關卡地形與世界／相機邊界
-    const level = new LevelSystem().build(this, MVP_LEVEL);
+    const level = new LevelSystem().build(this, TEST_LEVEL);
+    this.deathY = level.worldPx.height + u(3);
 
     // 玩家
     this.player = new Player(this, level.spawnPx.x, level.spawnPx.y);
     this.physics.add.collider(this.player, level.solids);
+
+    // 狀態與系統
+    this.gameState = new GameState(this);
+    this.checkpoints = new CheckpointSystem(level.spawnPx);
+    this.interactions = new InteractionSystem(this, this.player, this.gameState, this.checkpoints);
+    this.interactions.build(TEST_LEVEL);
 
     // 能力系統：預設先開啟能力方便測試（正式解鎖留待 Phase 15 pickup）
     this.abilities = new AbilitySystem(this);
@@ -63,9 +78,15 @@ export class GameScene extends Phaser.Scene {
   update(_time: number, delta: number): void {
     const wasGroundedBefore = this.wasGrounded;
     this.controller.update(delta);
+    this.interactions.update();
 
     const body = this.player.body as Phaser.Physics.Arcade.Body;
     const grounded = this.player.isGrounded;
+
+    // 掉落深淵 → 死亡重生
+    if (this.player.y > this.deathY) {
+      this.killPlayer();
+    }
 
     // 落地重擊 → 輕微震動
     if (grounded && !wasGroundedBefore && this.lastAirFallVy > u(CAMERA_CONFIG.hardLandingVyUnit)) {
@@ -73,5 +94,14 @@ export class GameScene extends Phaser.Scene {
     }
     if (!grounded) this.lastAirFallVy = body.velocity.y;
     this.wasGrounded = grounded;
+  }
+
+  /** 死亡：計次、震動並重生到最近 checkpoint */
+  private killPlayer(): void {
+    this.gameState.addDeath();
+    this.camera.largeShake();
+    this.checkpoints.respawn(this.player);
+    this.lastAirFallVy = 0;
+    this.wasGrounded = false;
   }
 }

@@ -5,6 +5,16 @@
 
 ## [Unreleased]
 
+### Phase 11–12：互動物件與 Checkpoint／重生（以簡易測試關卡驗證）
+
+- 新增 `data/levels.ts` 的 `TEST_LEVEL`（40×14，含坑）並讓 GameScene 暫用它驗證互動與重生；MVP_LEVEL 保留待整合後切回。
+- 新增共用實體 `entities/Interactable.ts`（key／door／switch／checkpoint／goal）。
+- 新增 `systems/InteractionSystem.ts`：key 碰到即拾取、locked_door 靠近按 E 且有 key 才開、switch 按 E 切換連動 switch_door、checkpoint 碰到即啟用。
+- 新增 `systems/GameState.ts`（keyCount／deaths，寫入 registry；Phase 16 會擴充）與 `systems/CheckpointSystem.ts`（記錄重生點並重生）。
+- GameScene 加入掉落深淵死亡判定（y > 世界高 + 3 units）→ deaths +1、大震動、重生到最近 checkpoint。
+- UIScene 顯示 Keys／Deaths／能力，全部讀 registry 即時刷新。
+- LevelSystem 物件標記改為只畫 goal，其餘互動物件交由 InteractionSystem。
+
 ### Phase 10：CameraSystem
 
 - 新增 `systems/CameraSystem.ts`：平滑跟隨（lerp 0.08）、死區（4×2.5 units）、`smallShake` / `largeShake`。

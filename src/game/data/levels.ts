@@ -41,5 +41,29 @@ export const MVP_LEVEL: LevelConfig = {
   ],
 };
 
+/**
+ * 簡易測試關卡（40 × 14 units）：平坦地面 + 一個坑，用來測互動物件與 Checkpoint／重生。
+ * 路線：起點 → checkpoint → 撿 key → 開 locked door → 跳過坑（掉下去→重生）→ 開關開 switch door → 終點。
+ */
+export const TEST_LEVEL: LevelConfig = {
+  id: "test-01",
+  name: "測試區",
+  worldWidthUnit: 40,
+  worldHeightUnit: 14,
+  spawnUnit: { x: 2, y: 9 },
+  solids: [
+    { xUnit: 0, yUnit: 12, wUnit: 14, hUnit: 2 }, // 地面 A（x0..14）
+    { xUnit: 17, yUnit: 12, wUnit: 23, hUnit: 2 }, // 地面 B（x17..40）；坑 x14..17
+  ],
+  objects: [
+    { id: "cp1", type: "checkpoint", xUnit: 6, yUnit: 12 },
+    { id: "key1", type: "key", xUnit: 9, yUnit: 11.6 },
+    { id: "door1", type: "locked_door", xUnit: 12, yUnit: 12 },
+    { id: "sw1", type: "switch", xUnit: 20, yUnit: 12, targetId: "swdoor1" },
+    { id: "swdoor1", type: "switch_door", xUnit: 24, yUnit: 12 },
+    { id: "goal1", type: "goal", xUnit: 38, yUnit: 11 },
+  ],
+};
+
 /** 全部關卡清單 */
-export const LEVELS: readonly LevelConfig[] = [MVP_LEVEL] as const;
+export const LEVELS: readonly LevelConfig[] = [MVP_LEVEL, TEST_LEVEL] as const;
