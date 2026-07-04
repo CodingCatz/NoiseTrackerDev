@@ -5,6 +5,15 @@
 
 ## [Unreleased]
 
+### Phase 4：跳躍、重力與可變跳高
+
+- PlayerController 加入跳躍（Space / W / ↑），起跳速度讀自 playerPhysics.ts。
+- 可變跳高：上升途中放開跳躍鍵以 `jumpCutMultiplier` 削減速度（短按小跳、長按高跳）。
+- 依垂直速度套用 `apexGravityMultiplier`（頂點滯空）與 `fallGravityMultiplier`（下落俐落）。
+- 新增設定 `apexThresholdUnit`（判定接近頂點的速度門檻）到手感檔。
+- main.ts 於開發模式暴露 `window.__game` 供除錯（正式 build 移除）。
+- 尚未實作二段跳（Phase 6）與 Coyote/Buffer（Phase 5）。
+
 ### Phase 3：Player 與基礎左右移動
 
 - 新增 `entities/Player.ts`（Arcade sprite，碰撞盒 0.45×0.85 unit、重力與最大下落速度）。

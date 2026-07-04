@@ -14,6 +14,13 @@ export class PlayerController {
   private readonly cursors: Phaser.Types.Input.Keyboard.CursorKeys;
   private readonly keyA: Phaser.Input.Keyboard.Key;
   private readonly keyD: Phaser.Input.Keyboard.Key;
+  /** 跳躍鍵：Space / W / ↑ */
+  private readonly jumpKeys: Phaser.Input.Keyboard.Key[];
+
+  /** 上一幀跳躍鍵是否按住，用來偵測按下／放開的邊緣 */
+  private prevJumpHeld = false;
+  /** 目前上升是否來自一次跳躍（用於可變跳高的削減判定） */
+  private isJumpRising = false;
 
   constructor(scene: Phaser.Scene, player: Player) {
     this.player = player;
@@ -25,6 +32,11 @@ export class PlayerController {
     this.cursors = keyboard.createCursorKeys();
     this.keyA = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
     this.keyD = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
+    this.jumpKeys = [
+      this.cursors.space,
+      this.cursors.up,
+      keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
+    ];
   }
 
   /**
@@ -46,6 +58,54 @@ export class PlayerController {
     body.setVelocityX(moveTowards(vx, targetVx, maxDelta));
 
     if (dir !== 0) this.player.setFacing(dir as 1 | -1);
+
+    this.handleJump(body);
+    this.applyGravityScale(body);
+  }
+
+  /**
+   * 跳躍與可變跳高：
+   * - 在地面按下跳躍鍵 → 給予起跳速度
+   * - 上升途中放開跳躍鍵 → 削減上升速度（短按小跳、長按高跳）
+   */
+  private handleJump(body: Phaser.Physics.Arcade.Body): void {
+    const p = PLAYER_PHYSICS;
+    const jumpHeld = this.jumpKeys.some((k) => k.isDown);
+    const jumpPressed = jumpHeld && !this.prevJumpHeld;
+    const jumpReleased = !jumpHeld && this.prevJumpHeld;
+    this.prevJumpHeld = jumpHeld;
+
+    if (jumpPressed && this.player.isGrounded) {
+      body.setVelocityY(-u(p.jumpVelocityUnit));
+      this.isJumpRising = true;
+    }
+
+    // 提早放開：削減仍在上升的速度
+    if (jumpReleased && this.isJumpRising && body.velocity.y < 0) {
+      body.setVelocityY(body.velocity.y * p.jumpCutMultiplier);
+    }
+
+    // 一旦不再上升，本次跳躍的削減判定結束
+    if (body.velocity.y >= 0) this.isJumpRising = false;
+  }
+
+  /**
+   * 依垂直速度調整重力倍率：接近頂點降重力（滯空感），下落時增重力（俐落）。
+   */
+  private applyGravityScale(body: Phaser.Physics.Arcade.Body): void {
+    const p = PLAYER_PHYSICS;
+    const vy = body.velocity.y;
+    let multiplier = 1;
+
+    if (vy < 0) {
+      // 上升中且接近頂點
+      if (Math.abs(vy) < u(p.apexThresholdUnit)) multiplier = p.apexGravityMultiplier;
+    } else {
+      // 下落
+      multiplier = p.fallGravityMultiplier;
+    }
+
+    body.setGravityY(u(p.gravityUnit) * multiplier);
   }
 
   /** 讀取左右輸入：-1 左、0 無、1 右 */

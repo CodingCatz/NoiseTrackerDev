@@ -26,6 +26,7 @@ export const PLAYER_PHYSICS: PlayerPhysicsConfig = {
   gravityUnit: 28, // 基礎重力
   maxFallSpeedUnit: 14, // 最大下落速度
   apexGravityMultiplier: 0.75, // 跳躍頂點降重力，增加滯空
+  apexThresholdUnit: 2.5, // |vy| 小於此值視為接近頂點
   fallGravityMultiplier: 1.25, // 下落時增重力，更俐落
 
   // 跳躍

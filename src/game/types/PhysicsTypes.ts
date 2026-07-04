@@ -28,6 +28,8 @@ export interface PlayerPhysicsConfig {
   jumpBufferMs: number;
   /** 跳躍頂點附近的重力倍率（<1 增加滯空感） */
   apexGravityMultiplier: number;
+  /** 判定「接近頂點」的垂直速度門檻 unit/s（|vy| 小於此值時套用 apex 重力） */
+  apexThresholdUnit: number;
   /** 下落時的重力倍率（>1 更俐落） */
   fallGravityMultiplier: number;
 }
