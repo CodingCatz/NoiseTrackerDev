@@ -5,6 +5,14 @@
 
 ## [Unreleased]
 
+### Phase 7：空中衝刺 Dash
+
+- PlayerController 加入 Dash（Shift / L / C）：方向依輸入（可斜向），無輸入則依面向；速度由 `dashDistanceUnit / dashDurationMs` 推導。
+- 衝刺期間關閉重力並解除下落上限維持全速，結束後收尾恢復；碰撞仍生效不穿牆。
+- 衝刺次數 `maxAirDashes` 與冷卻 `dashCooldownMs` 生效，落地重置；暴露 `dashing` / `dashReady` getter。
+- GameScene 預設解鎖 `dash`；UI 顯示 `Air Dash`。
+- Dash 優先於一般移動，未破壞跳躍／二段跳。
+
 ### Phase 6：二段跳（AbilitySystem）
 
 - 新增 `systems/AbilitySystem.ts`：集中管理能力解鎖與滯空次數，解鎖狀態寫入 registry 供 UI 讀取。

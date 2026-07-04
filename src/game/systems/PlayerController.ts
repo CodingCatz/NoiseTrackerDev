@@ -1,14 +1,17 @@
 import Phaser from "phaser";
 import { Player } from "../entities/Player";
 import { AbilitySystem } from "./AbilitySystem";
-import { PLAYER_PHYSICS, DOUBLE_JUMP_CONFIG } from "../data/playerPhysics";
+import { PLAYER_PHYSICS, DOUBLE_JUMP_CONFIG, DASH_CONFIG } from "../data/playerPhysics";
 import { u } from "../utils/units";
-import { moveTowards } from "../utils/math";
+import { moveTowards, clamp } from "../utils/math";
+
+/** 由 dash 距離與時間推導的衝刺速度（px/s） */
+const DASH_SPEED_PX = u(DASH_CONFIG.dashDistanceUnit) / (DASH_CONFIG.dashDurationMs / 1000);
 
 /**
- * PlayerController：把鍵盤輸入轉成玩家水平移動與跳躍。
+ * PlayerController：把鍵盤輸入轉成玩家水平移動、跳躍與衝刺。
  * 所有速度／加速度／容錯時間都讀自 playerPhysics.ts（unit/s、ms），在此轉成 px/s。
- * Phase 5 加入 Coyote Time 與 Jump Buffer 改善跳躍容錯，未動可變跳高。
+ * Phase 7 加入空中衝刺 Dash（方向依輸入，無輸入則依面向），衝刺期間關閉重力。
  */
 export class PlayerController {
   private readonly player: Player;
@@ -18,9 +21,24 @@ export class PlayerController {
   private readonly keyD: Phaser.Input.Keyboard.Key;
   /** 跳躍鍵：Space / W / ↑ */
   private readonly jumpKeys: Phaser.Input.Keyboard.Key[];
+  /** 衝刺鍵：Shift / L / C */
+  private readonly dashKeys: Phaser.Input.Keyboard.Key[];
+  /** 下方向鍵：↓ / S（用於衝刺方向） */
+  private readonly keyS: Phaser.Input.Keyboard.Key;
 
   /** 上一幀跳躍鍵是否按住，用來偵測按下／放開的邊緣 */
   private prevJumpHeld = false;
+  /** 上一幀衝刺鍵是否按住 */
+  private prevDashHeld = false;
+  /** 是否正在衝刺 */
+  private isDashing = false;
+  /** 衝刺剩餘時間（ms） */
+  private dashTimer = 0;
+  /** 衝刺冷卻剩餘時間（ms） */
+  private dashCooldownTimer = 0;
+  /** 衝刺速度向量（px/s） */
+  private dashVX = 0;
+  private dashVY = 0;
   /** 目前上升是否來自一次跳躍（用於可變跳高的削減判定） */
   private isJumpRising = false;
   /** Coyote 計時器（ms）：離地後仍可跳的剩餘時間 */
@@ -36,6 +54,16 @@ export class PlayerController {
   /** Jump Buffer 剩餘時間（ms），供 Debug overlay 讀取 */
   get jumpBufferRemainingMs(): number {
     return Math.max(0, this.jumpBufferTimer);
+  }
+
+  /** 是否正在衝刺，供 Debug overlay / 狀態顯示 */
+  get dashing(): boolean {
+    return this.isDashing;
+  }
+
+  /** 衝刺是否就緒（冷卻結束且尚有次數），供 Debug overlay */
+  get dashReady(): boolean {
+    return this.dashCooldownTimer <= 0 && this.abilities.canAirDash();
   }
 
   constructor(scene: Phaser.Scene, player: Player, abilities: AbilitySystem) {
@@ -54,6 +82,12 @@ export class PlayerController {
       this.cursors.up,
       keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
     ];
+    this.dashKeys = [
+      this.cursors.shift,
+      keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.L),
+      keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.C),
+    ];
+    this.keyS = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S);
   }
 
   /**
@@ -62,8 +96,12 @@ export class PlayerController {
    */
   update(deltaMs: number): void {
     const dt = deltaMs / 1000;
-    const dir = this.readHorizontalInput();
     const body = this.player.body as Phaser.Physics.Arcade.Body;
+
+    // 衝刺優先於一般移動；衝刺進行中直接接管本幀
+    if (this.handleDash(body, deltaMs)) return;
+
+    const dir = this.readHorizontalInput();
 
     const vx = body.velocity.x;
     const maxSpeed = u(PLAYER_PHYSICS.maxRunSpeedUnit);
@@ -78,6 +116,69 @@ export class PlayerController {
 
     this.handleJump(body, deltaMs);
     this.applyGravityScale(body);
+  }
+
+  /**
+   * 衝刺處理。回傳 true 表示本幀由衝刺接管（跳過一般移動／跳躍／重力）。
+   * - 方向依輸入（可斜向），無輸入則依面向
+   * - 衝刺期間關閉重力並維持固定速度，結束後收尾恢復
+   * - 碰撞仍生效，衝刺不會穿牆
+   */
+  private handleDash(body: Phaser.Physics.Arcade.Body, deltaMs: number): boolean {
+    this.dashCooldownTimer = Math.max(0, this.dashCooldownTimer - deltaMs);
+
+    const dashHeld = this.dashKeys.some((k) => k.isDown);
+    const dashPressed = dashHeld && !this.prevDashHeld;
+    this.prevDashHeld = dashHeld;
+
+    // 起始衝刺
+    if (!this.isDashing && dashPressed && this.dashReady) {
+      this.startDash(body);
+    }
+
+    if (!this.isDashing) return false;
+
+    // 進行中
+    this.dashTimer -= deltaMs;
+    if (this.dashTimer <= 0) {
+      this.endDash(body);
+      return false; // 本幀結束衝刺，交還一般物理
+    }
+    body.setVelocity(this.dashVX, this.dashVY);
+    return true;
+  }
+
+  /** 依輸入方向啟動一次衝刺 */
+  private startDash(body: Phaser.Physics.Arcade.Body): void {
+    let dx = this.readHorizontalInput();
+    let dy = (this.keyS.isDown || this.cursors.down.isDown ? 1 : 0) - (this.cursors.up.isDown ? 1 : 0);
+    if (dx === 0 && dy === 0) {
+      dx = this.player.facing; // 無方向輸入則依面向
+    }
+    const len = Math.hypot(dx, dy) || 1;
+    this.dashVX = (dx / len) * DASH_SPEED_PX;
+    this.dashVY = (dy / len) * DASH_SPEED_PX;
+
+    this.isDashing = true;
+    this.isJumpRising = false;
+    this.dashTimer = DASH_CONFIG.dashDurationMs;
+    this.dashCooldownTimer = DASH_CONFIG.dashCooldownMs;
+    this.abilities.useAirDash();
+
+    // 衝刺期間關閉重力並解除下落速度上限，維持全速
+    body.setAllowGravity(false);
+    body.maxVelocity.y = Number.MAX_SAFE_INTEGER;
+    if (dx !== 0) this.player.setFacing(dx > 0 ? 1 : -1);
+  }
+
+  /** 結束衝刺並收尾，恢復正常物理 */
+  private endDash(body: Phaser.Physics.Arcade.Body): void {
+    this.isDashing = false;
+    body.setAllowGravity(true);
+    body.maxVelocity.y = u(PLAYER_PHYSICS.maxFallSpeedUnit);
+    // 收尾：垂直歸零、水平夾到最大跑速，避免殘留超速
+    const maxRun = u(PLAYER_PHYSICS.maxRunSpeedUnit);
+    body.setVelocity(clamp(body.velocity.x, -maxRun, maxRun), 0);
   }
 
   /**

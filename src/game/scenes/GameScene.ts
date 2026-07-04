@@ -95,9 +95,10 @@ export class GameScene extends Phaser.Scene {
     this.player = new Player(this, u(2), GAME_HEIGHT - u(4));
     this.physics.add.collider(this.player, solids);
 
-    // 能力系統：Phase 6 預設先開啟二段跳方便測試（正式解鎖留待 Phase 15 pickup）
+    // 能力系統：預設先開啟能力方便測試（正式解鎖留待 Phase 15 pickup）
     this.abilities = new AbilitySystem(this);
     this.abilities.unlock("double_jump");
+    this.abilities.unlock("dash");
 
     this.controller = new PlayerController(this, this.player, this.abilities);
   }
