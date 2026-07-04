@@ -5,6 +5,13 @@
 
 ## [Unreleased]
 
+### Phase 5：Coyote Time 與 Jump Buffer
+
+- PlayerController 加入 Coyote Time（離地後 `coyoteTimeMs` 內仍可起跳）與 Jump Buffer（落地前 `jumpBufferMs` 內預按自動起跳），數值讀自 playerPhysics.ts。
+- 起跳條件改為「buffer 有效且 coyote 視窗開啟」，起跳後同時消耗兩者避免二次跳；未動可變跳高。
+- 暴露 `coyoteRemainingMs` / `jumpBufferRemainingMs` getter 供後續 Debug overlay。
+- GameScene 加入數塊高低錯落的測試平台（臨時測試骨架，Phase 9 由 LevelSystem 取代）。
+
 ### Phase 4：跳躍、重力與可變跳高
 
 - PlayerController 加入跳躍（Space / W / ↑），起跳速度讀自 playerPhysics.ts。

@@ -5,9 +5,9 @@ import { u } from "../utils/units";
 import { moveTowards } from "../utils/math";
 
 /**
- * PlayerController：把鍵盤輸入轉成玩家水平移動。
- * 所有速度／加速度都讀自 playerPhysics.ts（unit/s），在此轉成 px/s。
- * Phase 3 僅處理左右移動與加減速，跳躍留待 Phase 4。
+ * PlayerController：把鍵盤輸入轉成玩家水平移動與跳躍。
+ * 所有速度／加速度／容錯時間都讀自 playerPhysics.ts（unit/s、ms），在此轉成 px/s。
+ * Phase 5 加入 Coyote Time 與 Jump Buffer 改善跳躍容錯，未動可變跳高。
  */
 export class PlayerController {
   private readonly player: Player;
@@ -21,6 +21,20 @@ export class PlayerController {
   private prevJumpHeld = false;
   /** 目前上升是否來自一次跳躍（用於可變跳高的削減判定） */
   private isJumpRising = false;
+  /** Coyote 計時器（ms）：離地後仍可跳的剩餘時間 */
+  private coyoteTimer = 0;
+  /** Jump Buffer 計時器（ms）：預先按下跳躍的剩餘有效時間 */
+  private jumpBufferTimer = 0;
+
+  /** Coyote 剩餘時間（ms），供 Debug overlay 讀取 */
+  get coyoteRemainingMs(): number {
+    return Math.max(0, this.coyoteTimer);
+  }
+
+  /** Jump Buffer 剩餘時間（ms），供 Debug overlay 讀取 */
+  get jumpBufferRemainingMs(): number {
+    return Math.max(0, this.jumpBufferTimer);
+  }
 
   constructor(scene: Phaser.Scene, player: Player) {
     this.player = player;
@@ -59,25 +73,36 @@ export class PlayerController {
 
     if (dir !== 0) this.player.setFacing(dir as 1 | -1);
 
-    this.handleJump(body);
+    this.handleJump(body, deltaMs);
     this.applyGravityScale(body);
   }
 
   /**
-   * 跳躍與可變跳高：
-   * - 在地面按下跳躍鍵 → 給予起跳速度
-   * - 上升途中放開跳躍鍵 → 削減上升速度（短按小跳、長按高跳）
+   * 跳躍、容錯與可變跳高：
+   * - Coyote Time：離地後 coyoteTimeMs 內仍可起跳（降低邊緣挫折）
+   * - Jump Buffer：落地前 jumpBufferMs 內預按跳躍，落地瞬間自動起跳
+   * - 可變跳高：上升途中放開跳躍鍵以 jumpCutMultiplier 削減速度（短按小跳、長按高跳）
    */
-  private handleJump(body: Phaser.Physics.Arcade.Body): void {
+  private handleJump(body: Phaser.Physics.Arcade.Body, deltaMs: number): void {
     const p = PLAYER_PHYSICS;
+    const grounded = this.player.isGrounded;
+
     const jumpHeld = this.jumpKeys.some((k) => k.isDown);
     const jumpPressed = jumpHeld && !this.prevJumpHeld;
     const jumpReleased = !jumpHeld && this.prevJumpHeld;
     this.prevJumpHeld = jumpHeld;
 
-    if (jumpPressed && this.player.isGrounded) {
+    // 更新計時器：踩地時充滿 coyote；按下瞬間充滿 buffer
+    this.coyoteTimer = grounded ? p.coyoteTimeMs : this.coyoteTimer - deltaMs;
+    this.jumpBufferTimer = jumpPressed ? p.jumpBufferMs : this.jumpBufferTimer - deltaMs;
+
+    // 有緩衝中的跳躍輸入，且仍在 coyote 視窗內 → 起跳
+    if (this.jumpBufferTimer > 0 && this.coyoteTimer > 0) {
       body.setVelocityY(-u(p.jumpVelocityUnit));
       this.isJumpRising = true;
+      // 消耗掉，避免同一次輸入或 coyote 觸發二次跳
+      this.jumpBufferTimer = 0;
+      this.coyoteTimer = 0;
     }
 
     // 提早放開：削減仍在上升的速度
