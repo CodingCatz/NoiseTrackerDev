@@ -48,6 +48,14 @@ export interface LevelObjectConfig {
   targetId?: string;
 }
 
+/** 實心地形方塊（以左上角為基準，單位 unit） */
+export interface SolidConfig {
+  xUnit: number;
+  yUnit: number;
+  wUnit: number;
+  hUnit: number;
+}
+
 /** 單一關卡設定 */
 export interface LevelConfig {
   id: string;
@@ -58,6 +66,8 @@ export interface LevelConfig {
   worldHeightUnit: number;
   /** 玩家起始位置 unit */
   spawnUnit: { x: number; y: number };
+  /** 實心地形（地面、平台、牆） */
+  solids: SolidConfig[];
   /** 關卡互動物件 */
   objects: LevelObjectConfig[];
 }

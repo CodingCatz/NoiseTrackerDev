@@ -5,6 +5,13 @@
 
 ## [Unreleased]
 
+### Phase 9：Tilemap／關卡資料架構
+
+- 新增 `systems/LevelSystem.ts`：依 `levels.ts` 生成地形、物件標記，並設定世界與相機邊界。
+- `LevelTypes` 加入 `SolidConfig` 與 `LevelConfig.solids`；`levels.ts` 補上完整 MVP 關卡（80×20 units）：起點 → 二段跳階梯 → Dash 缺口 → 牆跳垂直區 → 高處走道 → 終點。
+- GameScene 改用 LevelSystem 生成地形，移除臨時測試平台；玩家由關卡 spawn 生成，相機基本跟隨（完整 CameraSystem 留待 Phase 10）。
+- Tile size 0.5 unit = 54 px；世界／相機邊界 8640×2160 px。
+
 ### Phase 8：牆滑與牆跳
 
 - PlayerController 重整跳躍／牆壁邏輯：`readWallSide` 以 `blocked.left/right` 判定貼牆，天生不把地板誤判成牆。
