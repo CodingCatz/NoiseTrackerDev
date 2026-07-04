@@ -3,6 +3,16 @@
 本專案所有值得記錄的變更都會寫在此檔。
 格式依版本號規則：`v0.X.0` 為功能里程碑，`v0.X.Ya` 為功能迭代，`v0.X.Yb` 為修復／優化。
 
+## [Unreleased]
+
+### Phase 1：Scene 架構
+
+- 新增 BootScene、MenuScene、GameScene、UIScene、GameOverScene 五個場景（`src/game/scenes/`）。
+- BootScene 以 graphics 產生玩家／地面 placeholder 貼圖，避免缺圖錯誤。
+- 場景流程：Boot →（自動）Menu →（Enter/Space）Game（平行啟動 UI）→（暫時 G 鍵）GameOver「CLEAR!」→（R）回 Menu。
+- `main.ts` 改以 `Phaser.Game` 註冊五場景，移除 Phase 0 佔位場景。
+- 仍無移動／物理玩法（留待 Phase 3 起）。
+
 ## [v0.1.0] - 2026-07-04
 
 ### Phase 0：建好專案底座
