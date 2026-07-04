@@ -5,6 +5,12 @@
 
 ## [Unreleased]
 
+### Phase 17：Debug Overlay
+
+- 新增 `systems/DebugOverlay.ts`：按 F3 開關（預設關閉），顯示 state、座標、速度（unit／unit-s）、grounded、touchingWall、wallSliding、coyote／buffer 計時、airJumpsUsed／airDashesUsed、dashReady、FPS。
+- PlayerController 新增 `currentState` getter，由物理狀態推導 PlayerState（idle／run／jump／fall／dash／wall_slide）。
+- 純 Phaser 文字、無外部 library；關閉時 update 直接跳出，不影響正式遊玩；面板置於 HUD 下方避免重疊。
+
 ### Phase 16：GameState 與通關流程
 
 - `GameState` 擴充為中央進度記錄：死亡次數、鑰匙數、已解鎖能力、目前存檔點 id、目前區域、是否通關，提供 `snapshot()` 一次查詢。

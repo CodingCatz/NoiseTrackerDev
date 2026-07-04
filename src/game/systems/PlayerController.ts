@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { Player } from "../entities/Player";
 import { AbilitySystem } from "./AbilitySystem";
+import type { PlayerState } from "../types/PlayerTypes";
 import {
   PLAYER_PHYSICS,
   DOUBLE_JUMP_CONFIG,
@@ -95,6 +96,17 @@ export class PlayerController {
   }
   get isTouchingWall(): boolean {
     return this.touchingWallSide !== 0;
+  }
+
+  /** 由目前物理狀態推導的 PlayerState（供 Debug overlay 顯示） */
+  get currentState(): PlayerState {
+    if (this.isDashing) return "dash";
+    const body = this.player.body as Phaser.Physics.Arcade.Body;
+    if (this.player.isGrounded) {
+      return Math.abs(body.velocity.x) > 10 ? "run" : "idle";
+    }
+    if (this.isWallSlidingNow) return "wall_slide";
+    return body.velocity.y < 0 ? "jump" : "fall";
   }
 
   // #endregion Debug getters

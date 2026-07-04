@@ -9,6 +9,7 @@ import { GameState } from "../systems/GameState";
 import { CheckpointSystem } from "../systems/CheckpointSystem";
 import { InteractionSystem } from "../systems/InteractionSystem";
 import { CollisionSystem } from "../systems/CollisionSystem";
+import { DebugOverlay } from "../systems/DebugOverlay";
 import { Hazard } from "../entities/Hazard";
 import { MovingPlatform } from "../entities/MovingPlatform";
 import { TUTORIAL_LEVEL } from "../data/levels";
@@ -29,6 +30,7 @@ export class GameScene extends Phaser.Scene {
   private checkpoints!: CheckpointSystem;
   private interactions!: InteractionSystem;
   private collisions!: CollisionSystem;
+  private debug!: DebugOverlay;
   private platforms: MovingPlatform[] = [];
 
   /** 上一幀是否在地面，用於偵測落地瞬間 */
@@ -87,6 +89,9 @@ export class GameScene extends Phaser.Scene {
     // 相機：平滑跟隨 + 死區 + 震動（世界邊界已由 LevelSystem 設定，相機自動夾在其中）
     this.camera = new CameraSystem(this, this.player);
 
+    // Debug overlay（F3 開關，預設關閉）
+    this.debug = new DebugOverlay(this);
+
     // UI 以獨立 Scene 平行疊在遊戲畫面上方
     this.scene.launch(SceneKeys.UI);
 
@@ -115,6 +120,8 @@ export class GameScene extends Phaser.Scene {
     }
     if (!grounded) this.lastAirFallVy = body.velocity.y;
     this.wasGrounded = grounded;
+
+    this.debug.update(this.player, this.controller, this.abilities, this.game.loop.actualFps);
   }
 
   /** 死亡：計次、震動並重生到最近 checkpoint（本專案無 Game Over，死亡只重生） */
