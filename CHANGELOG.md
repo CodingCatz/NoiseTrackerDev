@@ -5,6 +5,14 @@
 
 ## [Unreleased]
 
+### Phase 19：Mobile 觸控操作（選配）
+
+- 新增 `utils/platform.ts`（`isTouchLikely`：觸控裝置或視窗寬 < 900 才判定為手機／小螢幕）。
+- 新增 `systems/VirtualInput.ts`（虛擬輸入狀態）與 `systems/TouchControls.ts`（左右／跳／衝刺／互動半透明圓形按鈕，置於畫面下方兩側、不遮擋中央）。
+- PlayerController／CollisionSystem 讀輸入時合併鍵盤與 VirtualInput；桌機虛擬輸入恆為 false，鍵盤操作完全不變。
+- 觸控按鈕僅在手機／觸控／小螢幕出現；桌機不建立。支援多點觸控（方向 + 動作同時）。
+- UIScene 能力標籤在桌機附上鍵盤提示（二段跳 [Space]／衝刺 [Shift]／牆跳 [Space+牆]），觸控模式則隱藏。
+
 ### HUD／關卡調整
 
 - 能力改以圖示呈現（二段跳／衝刺／牆跳），未取得時變暗、取得後亮燈（白框全亮）。

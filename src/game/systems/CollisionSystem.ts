@@ -6,6 +6,7 @@ import { AbilityPickup } from "../entities/AbilityPickup";
 import { MovingPlatform } from "../entities/MovingPlatform";
 import { InteractionSystem } from "./InteractionSystem";
 import { AbilitySystem } from "./AbilitySystem";
+import { VirtualInput } from "./VirtualInput";
 import { GameState } from "./GameState";
 import { CheckpointSystem } from "./CheckpointSystem";
 import { INTERACTABLE_META } from "../data/interactables";
@@ -29,6 +30,7 @@ export interface CollisionRefs {
   hazards: Hazard[];
   interactions: InteractionSystem;
   abilities: AbilitySystem;
+  virtual: VirtualInput;
   gameState: GameState;
   checkpoints: CheckpointSystem;
   /** 掉落深淵的死亡判定 y（px） */
@@ -102,7 +104,9 @@ export class CollisionSystem {
     if (this.refs.player.y > this.refs.deathY) {
       this.die();
     }
-    if (Phaser.Input.Keyboard.JustDown(this.eKey)) {
+    // 互動：鍵盤 E 或觸控互動按鈕
+    const interact = Phaser.Input.Keyboard.JustDown(this.eKey) || this.refs.virtual.consumeInteract();
+    if (interact) {
       this.handleSwitches();
       this.handleLockedDoors();
     }

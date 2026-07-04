@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { Player } from "../entities/Player";
 import { AbilitySystem } from "./AbilitySystem";
+import { VirtualInput } from "./VirtualInput";
 import type { PlayerState } from "../types/PlayerTypes";
 import {
   PLAYER_PHYSICS,
@@ -25,6 +26,7 @@ type WallSide = -1 | 0 | 1;
 export class PlayerController {
   private readonly player: Player;
   private readonly abilities: AbilitySystem;
+  private readonly virtual: VirtualInput;
   private readonly cursors: Phaser.Types.Input.Keyboard.CursorKeys;
   private readonly keyA: Phaser.Input.Keyboard.Key;
   private readonly keyD: Phaser.Input.Keyboard.Key;
@@ -53,9 +55,10 @@ export class PlayerController {
   private isWallSlidingNow = false;
   private touchingWallSide: WallSide = 0;
 
-  constructor(scene: Phaser.Scene, player: Player, abilities: AbilitySystem) {
+  constructor(scene: Phaser.Scene, player: Player, abilities: AbilitySystem, virtual: VirtualInput) {
     this.player = player;
     this.abilities = abilities;
+    this.virtual = virtual;
 
     const keyboard = scene.input.keyboard;
     if (!keyboard) {
@@ -126,7 +129,7 @@ export class PlayerController {
     this.touchingWallSide = wall;
 
     // 跳躍鍵邊緣偵測
-    const jumpHeld = this.jumpKeys.some((k) => k.isDown);
+    const jumpHeld = this.jumpKeys.some((k) => k.isDown) || this.virtual.jump;
     const jumpPressed = jumpHeld && !this.prevJumpHeld;
     const jumpReleased = !jumpHeld && this.prevJumpHeld;
     this.prevJumpHeld = jumpHeld;
@@ -174,10 +177,10 @@ export class PlayerController {
     if (dir !== 0) this.player.setFacing(dir as 1 | -1);
   }
 
-  /** 讀取左右輸入：-1 左、0 無、1 右 */
+  /** 讀取左右輸入（鍵盤 + 觸控）：-1 左、0 無、1 右 */
   private readHorizontalInput(): number {
-    const left = this.cursors.left.isDown || this.keyA.isDown;
-    const right = this.cursors.right.isDown || this.keyD.isDown;
+    const left = this.cursors.left.isDown || this.keyA.isDown || this.virtual.left;
+    const right = this.cursors.right.isDown || this.keyD.isDown || this.virtual.right;
     return (right ? 1 : 0) - (left ? 1 : 0);
   }
 
@@ -276,7 +279,7 @@ export class PlayerController {
   private handleDash(body: Phaser.Physics.Arcade.Body, deltaMs: number): boolean {
     this.dashCooldownTimer = Math.max(0, this.dashCooldownTimer - deltaMs);
 
-    const dashHeld = this.dashKeys.some((k) => k.isDown);
+    const dashHeld = this.dashKeys.some((k) => k.isDown) || this.virtual.dash;
     const dashPressed = dashHeld && !this.prevDashHeld;
     this.prevDashHeld = dashHeld;
 

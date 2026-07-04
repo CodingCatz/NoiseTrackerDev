@@ -10,6 +10,8 @@ import { CheckpointSystem } from "../systems/CheckpointSystem";
 import { InteractionSystem } from "../systems/InteractionSystem";
 import { CollisionSystem } from "../systems/CollisionSystem";
 import { DebugOverlay } from "../systems/DebugOverlay";
+import { VirtualInput } from "../systems/VirtualInput";
+import { TouchControls } from "../systems/TouchControls";
 import { Hazard } from "../entities/Hazard";
 import { MovingPlatform } from "../entities/MovingPlatform";
 import { TUTORIAL_LEVEL } from "../data/levels";
@@ -34,6 +36,7 @@ export class GameScene extends Phaser.Scene {
   private collisions!: CollisionSystem;
   private debug!: DebugOverlay;
   private sfx!: Sfx;
+  private virtual!: VirtualInput;
   private platforms: MovingPlatform[] = [];
 
   /** 上一幀是否在地面，用於偵測落地瞬間 */
@@ -72,7 +75,9 @@ export class GameScene extends Phaser.Scene {
     // 能力系統：全部從未解鎖開始，需在關卡中撿到對應道具才解鎖
     this.abilities = new AbilitySystem(this);
 
-    this.controller = new PlayerController(this, this.player, this.abilities);
+    // 虛擬輸入（觸控按鈕寫入、控制器讀取）
+    this.virtual = new VirtualInput();
+    this.controller = new PlayerController(this, this.player, this.abilities, this.virtual);
 
     // 所有碰撞判斷集中於此
     this.collisions = new CollisionSystem(this, {
@@ -82,6 +87,7 @@ export class GameScene extends Phaser.Scene {
       hazards,
       interactions: this.interactions,
       abilities: this.abilities,
+      virtual: this.virtual,
       gameState: this.gameState,
       checkpoints: this.checkpoints,
       deathY: level.worldPx.height + u(3),
@@ -97,6 +103,9 @@ export class GameScene extends Phaser.Scene {
 
     // 音效掛勾（目前無音檔，安靜跳過）
     this.sfx = new Sfx(this);
+
+    // 觸控操作（僅手機／平板／小螢幕出現；桌機不建立）
+    new TouchControls(this, this.virtual);
 
     // UI 以獨立 Scene 平行疊在遊戲畫面上方
     this.scene.launch(SceneKeys.UI);

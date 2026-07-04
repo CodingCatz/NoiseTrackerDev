@@ -4,13 +4,14 @@ import { GAME_WIDTH } from "../config/gameConfig";
 import { REGISTRY_UNLOCKED_ABILITIES } from "../systems/AbilitySystem";
 import { REGISTRY_KEY_COUNT, REGISTRY_DEATHS } from "../systems/GameState";
 import { ABILITY_PICKUP_COLORS } from "../data/abilities";
+import { isTouchLikely } from "../utils/platform";
 import type { AbilityId } from "../types/AbilityTypes";
 
-/** HUD 上顯示的能力圖示（依取得順序） */
-const HUD_ABILITIES: { id: AbilityId; label: string }[] = [
-  { id: "double_jump", label: "二段跳" },
-  { id: "dash", label: "衝刺" },
-  { id: "wall_jump", label: "牆跳" },
+/** HUD 上顯示的能力圖示（依取得順序，key 為桌機操作提示） */
+const HUD_ABILITIES: { id: AbilityId; label: string; key: string }[] = [
+  { id: "double_jump", label: "二段跳", key: "Space" },
+  { id: "dash", label: "衝刺", key: "Shift" },
+  { id: "wall_jump", label: "牆跳", key: "Space+牆" },
 ];
 
 /** 單一能力圖示（圓形＋標籤），未取得時暗、取得後亮燈 */
@@ -77,17 +78,19 @@ export class UIScene extends Phaser.Scene {
     this.bind(REGISTRY_UNLOCKED_ABILITIES);
   }
 
-  /** 建立能力圖示（初始為暗） */
+  /** 建立能力圖示（初始為暗）；桌機在標籤附上鍵盤提示 */
   private buildAbilityIcons(startX: number, y: number): void {
-    const gap = 130;
+    const gap = 190;
+    const showKeyHint = !isTouchLikely();
     HUD_ABILITIES.forEach((a, i) => {
       const x = startX + i * gap;
       const color = ABILITY_PICKUP_COLORS[a.id] ?? 0xffffff;
       const dot = this.add.circle(x, y, 16, color);
+      const text = showKeyHint ? `${a.label} [${a.key}]` : a.label;
       const label = this.add
-        .text(x + 26, y, a.label, {
+        .text(x + 26, y, text, {
           fontFamily: "sans-serif",
-          fontSize: "24px",
+          fontSize: "22px",
           color: "#ffffff",
         })
         .setOrigin(0, 0.5);
