@@ -2,12 +2,18 @@ import Phaser from "phaser";
 import { SceneKeys, TextureKeys } from "../config/sceneKeys";
 import { GAME_WIDTH, GAME_HEIGHT } from "../config/gameConfig";
 import { u } from "../utils/units";
+import { Player } from "../entities/Player";
+import { PlayerController } from "../systems/PlayerController";
 
 /**
- * GameScene：Phase 1 僅顯示 FHD 背景、地面 placeholder 與玩家 placeholder，
- * 並平行啟動 UIScene。尚無任何移動或物理邏輯（留待 Phase 3 起實作）。
+ * GameScene：組裝玩家與地面並驅動控制器。
+ * Phase 3 加入 Player 與 PlayerController，支援左右移動；地面為 placeholder，
+ * 玩家會落地不穿地。跳躍與正式關卡留待後續 Phase。
  */
 export class GameScene extends Phaser.Scene {
+  private player!: Player;
+  private controller!: PlayerController;
+
   constructor() {
     super(SceneKeys.Game);
   }
@@ -15,8 +21,8 @@ export class GameScene extends Phaser.Scene {
   create(): void {
     this.cameras.main.setBackgroundColor("#1a1a24");
 
-    this.drawGround();
-    this.drawPlayerPlaceholder();
+    const ground = this.drawGround();
+    this.spawnPlayer(ground);
 
     // UI 以獨立 Scene 平行疊在遊戲畫面上方
     this.scene.launch(SceneKeys.UI);
@@ -28,8 +34,14 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  /** 沿畫面底部鋪一排地面 tile 作為 placeholder */
-  private drawGround(): void {
+  update(_time: number, delta: number): void {
+    this.controller.update(delta);
+  }
+
+  /**
+   * 沿畫面底部鋪一排地面 tile placeholder，並回傳一個涵蓋地面的靜態碰撞體。
+   */
+  private drawGround(): Phaser.GameObjects.Rectangle {
     const tile = Math.round(u(0.5));
     const rows = 2;
     const cols = Math.ceil(GAME_WIDTH / tile);
@@ -37,18 +49,22 @@ export class GameScene extends Phaser.Scene {
 
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < cols; col++) {
-        this.add
-          .image(col * tile, startY + row * tile, TextureKeys.Ground)
-          .setOrigin(0, 0);
+        this.add.image(col * tile, startY + row * tile, TextureKeys.Ground).setOrigin(0, 0);
       }
     }
+
+    // 靜態碰撞體：涵蓋整排地面，玩家與之碰撞不會穿透
+    const groundH = rows * tile;
+    const ground = this.add.rectangle(GAME_WIDTH / 2, startY + groundH / 2, GAME_WIDTH, groundH);
+    this.physics.add.existing(ground, true);
+    return ground;
   }
 
-  /** 放一個站在地面上的玩家 placeholder */
-  private drawPlayerPlaceholder(): void {
-    const tile = Math.round(u(0.5));
-    const groundTop = GAME_HEIGHT - 2 * tile;
-    // 玩家起始位置 x = 2 units，腳底貼齊地面
-    this.add.image(u(2), groundTop, TextureKeys.Player).setOrigin(0.5, 1);
+  /** 產生玩家並與地面建立碰撞、掛上控制器 */
+  private spawnPlayer(ground: Phaser.GameObjects.Rectangle): void {
+    // 起始位置 x = 2 units，稍高於地面讓其落下（示範不穿地）
+    this.player = new Player(this, u(2), GAME_HEIGHT - u(4));
+    this.physics.add.collider(this.player, ground);
+    this.controller = new PlayerController(this, this.player);
   }
 }

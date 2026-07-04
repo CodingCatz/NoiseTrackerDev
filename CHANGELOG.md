@@ -5,6 +5,14 @@
 
 ## [Unreleased]
 
+### Phase 3：Player 與基礎左右移動
+
+- 新增 `entities/Player.ts`（Arcade sprite，碰撞盒 0.45×0.85 unit、重力與最大下落速度）。
+- 新增 `systems/PlayerController.ts`，讀取方向鍵／A・D，套用加速／減速／轉身，速度全讀自 playerPhysics.ts。
+- 新增 `utils/math.ts`（clamp、moveTowards）。
+- GameScene 加入靜態地面碰撞體與玩家，控制邏輯委由 PlayerController，玩家落地不穿地。
+- 尚未實作跳躍（留待 Phase 4）；Camera 跟隨與世界邊界留待 Phase 9/10。
+
 ### Phase 2：資料驅動的物理參數
 
 - 建立型別 `src/game/types/`：PhysicsTypes、AbilityTypes、PlayerTypes、LevelTypes、GameTypes。
