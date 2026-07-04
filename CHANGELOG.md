@@ -5,6 +5,16 @@
 
 ## [Unreleased]
 
+### Phase 15：能力拾取與教學關卡
+
+- 能力改為「撿到道具才解鎖」：移除 GameScene 的預設全開；二段跳／衝刺／牆跳皆由場上道具解鎖（牆跳一併給牆滑）。
+- 新增 `entities/AbilityPickup.ts`：道具一律以圓形呈現，不同能力不同顏色（`ABILITY_PICKUP_COLORS`：二段跳藍／衝刺黃／牆跳綠）。
+- InteractionSystem 建立 ability_pickup；CollisionSystem 加入拾取 overlap → 解鎖並發送 `ability:unlocked`。
+- 新增 `TUTORIAL_LEVEL`（50×20）並改由 GameScene 使用：路線依能力設計——
+  - 起點撿【二段跳】→ 3.5u 高台（單跳 2.2u 上不去）撿【衝刺】
+  - → 6u 缺口（一般跳跨不過）撿【牆跳】→ 11u 垂直通道（需牆跳爬升）→ 終點。
+- 地面與牆一律用相同格狀地板圖；HUD 顯示已解鎖能力（讀 registry 即時刷新）。
+
 ### Phase 14：抽出 CollisionSystem（純整理，行為不變）
 
 - 新增 `systems/CollisionSystem.ts`：集中所有碰撞判斷——玩家 vs 地面／移動平台／門（阻擋）、vs 陷阱／掉落深淵（致死）、vs 鑰匙（拾取）／checkpoint（啟用）、以及靠近按 E 開門／切換開關。

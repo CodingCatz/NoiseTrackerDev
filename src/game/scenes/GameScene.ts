@@ -11,13 +11,13 @@ import { InteractionSystem } from "../systems/InteractionSystem";
 import { CollisionSystem } from "../systems/CollisionSystem";
 import { Hazard } from "../entities/Hazard";
 import { MovingPlatform } from "../entities/MovingPlatform";
-import { TEST_LEVEL } from "../data/levels";
+import { TUTORIAL_LEVEL } from "../data/levels";
 import { CAMERA_CONFIG } from "../data/cameraConfig";
 import { u } from "../utils/units";
 
 /**
  * GameScene：組裝關卡、玩家與各系統並驅動控制器。
- * Phase 11/12 使用簡易測試關卡（TEST_LEVEL）驗證互動物件與 Checkpoint／重生。
+ * Phase 15 使用教學關卡（TUTORIAL_LEVEL）：能力改由場上圓形道具解鎖，路線依能力設計。
  * 正式關卡 MVP_LEVEL 保留待整合後切回。
  */
 export class GameScene extends Phaser.Scene {
@@ -43,7 +43,7 @@ export class GameScene extends Phaser.Scene {
   create(): void {
     this.cameras.main.setBackgroundColor("#1a1a24");
 
-    const level = new LevelSystem().build(this, TEST_LEVEL);
+    const level = new LevelSystem().build(this, TUTORIAL_LEVEL);
 
     // 玩家
     this.player = new Player(this, level.spawnPx.x, level.spawnPx.y);
@@ -54,18 +54,14 @@ export class GameScene extends Phaser.Scene {
 
     // 建立互動物件（僅建立，不含碰撞判斷）
     this.interactions = new InteractionSystem(this);
-    this.interactions.build(TEST_LEVEL);
+    this.interactions.build(TUTORIAL_LEVEL);
 
     // 陷阱與移動平台（僅建立實體）
-    const hazards = (TEST_LEVEL.hazards ?? []).map((cfg) => new Hazard(this, cfg));
-    this.platforms = (TEST_LEVEL.platforms ?? []).map((cfg) => new MovingPlatform(this, cfg));
+    const hazards = (TUTORIAL_LEVEL.hazards ?? []).map((cfg) => new Hazard(this, cfg));
+    this.platforms = (TUTORIAL_LEVEL.platforms ?? []).map((cfg) => new MovingPlatform(this, cfg));
 
-    // 能力系統：預設先開啟能力方便測試（正式解鎖留待 Phase 15 pickup）
+    // 能力系統：全部從未解鎖開始，需在關卡中撿到對應道具才解鎖
     this.abilities = new AbilitySystem(this);
-    this.abilities.unlock("double_jump");
-    this.abilities.unlock("dash");
-    this.abilities.unlock("wall_slide");
-    this.abilities.unlock("wall_jump");
 
     this.controller = new PlayerController(this, this.player, this.abilities);
 
@@ -76,6 +72,7 @@ export class GameScene extends Phaser.Scene {
       platforms: this.platforms,
       hazards,
       interactions: this.interactions,
+      abilities: this.abilities,
       gameState: this.gameState,
       checkpoints: this.checkpoints,
       deathY: level.worldPx.height + u(3),

@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { Interactable } from "../entities/Interactable";
+import { AbilityPickup } from "../entities/AbilityPickup";
 import type { LevelConfig, LevelObjectConfig } from "../types/LevelTypes";
 import { INTERACTABLE_META } from "../data/interactables";
 import { u } from "../utils/units";
@@ -23,6 +24,7 @@ export class InteractionSystem {
   readonly checkpoints: Interactable[] = [];
   readonly doors = new Map<string, Interactable>();
   readonly switches: SwitchEntry[] = [];
+  readonly abilityPickups: AbilityPickup[] = [];
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -44,6 +46,13 @@ export class InteractionSystem {
         case "locked_door":
         case "switch_door":
           this.doors.set(obj.id, this.spawn(obj, u(1), u(3)));
+          break;
+        case "ability_pickup":
+          if (obj.grantsAbilityId) {
+            this.abilityPickups.push(
+              new AbilityPickup(this.scene, u(obj.xUnit), u(obj.yUnit), u(0.35), obj.grantsAbilityId)
+            );
+          }
           break;
         default:
           break; // goal 由 LevelSystem 處理

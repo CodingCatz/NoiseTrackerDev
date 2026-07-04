@@ -1,4 +1,13 @@
-import type { AbilityInfo } from "../types/AbilityTypes";
+import type { AbilityInfo, AbilityId } from "../types/AbilityTypes";
+
+/** 能力道具（圓形）顯示顏色：不同能力不同色 */
+export const ABILITY_PICKUP_COLORS: Record<AbilityId, number> = {
+  double_jump: 0x4fa3ff, // 藍
+  dash: 0xffd34e, // 黃
+  wall_jump: 0x8affc0, // 綠
+  wall_slide: 0x8affc0, // 綠（與牆跳同系）
+  ground_pound: 0xff8a3a, // 橘
+};
 
 /** 能力清單（給 UI 顯示與 ability pickup 授予使用） */
 export const ABILITIES: readonly AbilityInfo[] = [

@@ -2,8 +2,10 @@ import Phaser from "phaser";
 import { Player } from "../entities/Player";
 import { Hazard } from "../entities/Hazard";
 import { Interactable } from "../entities/Interactable";
+import { AbilityPickup } from "../entities/AbilityPickup";
 import { MovingPlatform } from "../entities/MovingPlatform";
 import { InteractionSystem } from "./InteractionSystem";
+import { AbilitySystem } from "./AbilitySystem";
 import { GameState } from "./GameState";
 import { CheckpointSystem } from "./CheckpointSystem";
 import { INTERACTABLE_META } from "../data/interactables";
@@ -15,6 +17,7 @@ export const CollisionEvents = {
   KeyChanged: "key:changed",
   DoorOpened: "door:opened",
   CheckpointActivated: "checkpoint:activated",
+  AbilityUnlocked: "ability:unlocked",
 } as const;
 
 /** 建立 CollisionSystem 所需的參照 */
@@ -24,6 +27,7 @@ export interface CollisionRefs {
   platforms: MovingPlatform[];
   hazards: Hazard[];
   interactions: InteractionSystem;
+  abilities: AbilitySystem;
   gameState: GameState;
   checkpoints: CheckpointSystem;
   /** 掉落深淵的死亡判定 y（px） */
@@ -78,6 +82,11 @@ export class CollisionSystem {
     for (const cp of interactions.checkpoints) {
       physics.add.overlap(player, cp, () => this.activateCheckpoint(cp));
     }
+
+    // 能力道具：碰到即解鎖對應能力
+    for (const pickup of interactions.abilityPickups) {
+      physics.add.overlap(player, pickup, () => this.pickupAbility(pickup));
+    }
   }
 
   /** 每幀連續判斷：掉落深淵死亡、E 互動（開門／切換開關） */
@@ -103,6 +112,14 @@ export class CollisionSystem {
     this.refs.gameState.addKey();
     key.destroy();
     this.scene.events.emit(CollisionEvents.KeyChanged, this.refs.gameState.keyCount);
+  }
+
+  private pickupAbility(pickup: AbilityPickup): void {
+    this.refs.abilities.unlock(pickup.abilityId);
+    // 牆跳與牆滑成對：撿到牆跳一併解鎖牆滑，垂直通道才好爬
+    if (pickup.abilityId === "wall_jump") this.refs.abilities.unlock("wall_slide");
+    pickup.destroy();
+    this.scene.events.emit(CollisionEvents.AbilityUnlocked, pickup.abilityId);
   }
 
   private activateCheckpoint(cp: Interactable): void {
