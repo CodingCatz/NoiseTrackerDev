@@ -8,6 +8,8 @@ import { CameraSystem } from "../systems/CameraSystem";
 import { GameState } from "../systems/GameState";
 import { CheckpointSystem } from "../systems/CheckpointSystem";
 import { InteractionSystem } from "../systems/InteractionSystem";
+import { Hazard } from "../entities/Hazard";
+import { MovingPlatform } from "../entities/MovingPlatform";
 import { TEST_LEVEL } from "../data/levels";
 import { CAMERA_CONFIG } from "../data/cameraConfig";
 import { u } from "../utils/units";
@@ -25,6 +27,7 @@ export class GameScene extends Phaser.Scene {
   private gameState!: GameState;
   private checkpoints!: CheckpointSystem;
   private interactions!: InteractionSystem;
+  private platforms: MovingPlatform[] = [];
   /** 掉落深淵的死亡判定 y（px） */
   private deathY = Number.MAX_SAFE_INTEGER;
 
@@ -53,6 +56,19 @@ export class GameScene extends Phaser.Scene {
     this.interactions = new InteractionSystem(this, this.player, this.gameState, this.checkpoints);
     this.interactions.build(TEST_LEVEL);
 
+    // 陷阱：接觸即死亡重生
+    for (const cfg of TEST_LEVEL.hazards ?? []) {
+      const hazard = new Hazard(this, cfg);
+      this.physics.add.overlap(this.player, hazard, () => this.killPlayer());
+    }
+
+    // 移動平台：與玩家碰撞，站上去穩定跟隨
+    this.platforms = (TEST_LEVEL.platforms ?? []).map((cfg) => {
+      const platform = new MovingPlatform(this, cfg);
+      this.physics.add.collider(this.player, platform);
+      return platform;
+    });
+
     // 能力系統：預設先開啟能力方便測試（正式解鎖留待 Phase 15 pickup）
     this.abilities = new AbilitySystem(this);
     this.abilities.unlock("double_jump");
@@ -79,6 +95,11 @@ export class GameScene extends Phaser.Scene {
     const wasGroundedBefore = this.wasGrounded;
     this.controller.update(delta);
     this.interactions.update();
+
+    // 移動平台：更新位移邏輯（玩家跟隨由 Arcade 內建摩擦處理）
+    for (const platform of this.platforms) {
+      platform.step(delta);
+    }
 
     const body = this.player.body as Phaser.Physics.Arcade.Body;
     const grounded = this.player.isGrounded;

@@ -5,6 +5,13 @@
 
 ## [Unreleased]
 
+### Phase 13：陷阱與移動平台
+
+- 新增 `entities/Hazard.ts`（spike／saw）：接觸玩家即死亡重生。
+- 新增 `entities/MovingPlatform.ts`：兩點來回、端點停留；玩家站上去由 Arcade immovable body 內建摩擦自動穩定跟隨（不抖動、不穿透）。
+- `LevelTypes` 加入 `HazardConfig` / `MovingPlatformConfig`；TEST_LEVEL 補上一排尖刺與一台水平移動平台。
+- GameScene 建立陷阱 overlap（致死）與移動平台碰撞，並每幀更新平台位移。
+
 ### Phase 11–12：互動物件與 Checkpoint／重生（以簡易測試關卡驗證）
 
 - 新增 `data/levels.ts` 的 `TEST_LEVEL`（40×14，含坑）並讓 GameScene 暫用它驗證互動與重生；MVP_LEVEL 保留待整合後切回。

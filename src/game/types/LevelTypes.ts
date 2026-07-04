@@ -56,6 +56,29 @@ export interface SolidConfig {
   hUnit: number;
 }
 
+/** 陷阱設定（接觸即死亡，單位 unit，以左下角為基準） */
+export interface HazardConfig {
+  type: "spike" | "saw";
+  xUnit: number;
+  yUnit: number;
+  wUnit: number;
+  hUnit: number;
+}
+
+/** 移動平台設定（於 (xUnit,yUnit) 與 (toXUnit,toYUnit) 兩點來回，座標為中心） */
+export interface MovingPlatformConfig {
+  xUnit: number;
+  yUnit: number;
+  wUnit: number;
+  hUnit: number;
+  toXUnit: number;
+  toYUnit: number;
+  /** 速度 unit/s（預設 1.5） */
+  speedUnit?: number;
+  /** 端點停留毫秒（預設 500） */
+  waitMs?: number;
+}
+
 /** 單一關卡設定 */
 export interface LevelConfig {
   id: string;
@@ -70,4 +93,8 @@ export interface LevelConfig {
   solids: SolidConfig[];
   /** 關卡互動物件 */
   objects: LevelObjectConfig[];
+  /** 陷阱（選配） */
+  hazards?: HazardConfig[];
+  /** 移動平台（選配） */
+  platforms?: MovingPlatformConfig[];
 }

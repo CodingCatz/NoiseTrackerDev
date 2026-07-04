@@ -63,6 +63,14 @@ export const TEST_LEVEL: LevelConfig = {
     { id: "swdoor1", type: "switch_door", xUnit: 24, yUnit: 12 },
     { id: "goal1", type: "goal", xUnit: 38, yUnit: 11 },
   ],
+  hazards: [
+    // 地面 B 上的一排尖刺（x30..32）
+    { type: "spike", xUnit: 30, yUnit: 12, wUnit: 2, hUnit: 0.5 },
+  ],
+  platforms: [
+    // 水平移動平台，於 x27 與 x33 之間來回（供站上去測試穩定跟隨）
+    { xUnit: 27, yUnit: 10.5, wUnit: 2, hUnit: 0.4, toXUnit: 33, toYUnit: 10.5, speedUnit: 1.5, waitMs: 500 },
+  ],
 };
 
 /** 全部關卡清單 */
