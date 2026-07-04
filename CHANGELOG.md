@@ -5,6 +5,14 @@
 
 ## [Unreleased]
 
+### Phase 14：抽出 CollisionSystem（純整理，行為不變）
+
+- 新增 `systems/CollisionSystem.ts`：集中所有碰撞判斷——玩家 vs 地面／移動平台／門（阻擋）、vs 陷阱／掉落深淵（致死）、vs 鑰匙（拾取）／checkpoint（啟用）、以及靠近按 E 開門／切換開關。
+- CollisionSystem 發送事件 `player:died` / `key:changed` / `door:opened` / `checkpoint:activated`；死亡的實際重生仍交回 GameScene 的 `killPlayer`，維持原行為。
+- `InteractionSystem` 精簡為「只建立互動物件」，移除碰撞／overlap／E 判斷與 update()。
+- GameScene 移除散落的 collider/overlap 與掉落判定，改由 CollisionSystem 統一處理，明顯變乾淨。
+- 回歸驗證：踩地、key、E 開門、開關、spike／pit 死亡重生、移動平台載人皆與整理前一致。
+
 ### Phase 13：陷阱與移動平台
 
 - 新增 `entities/Hazard.ts`（spike／saw）：接觸玩家即死亡重生。

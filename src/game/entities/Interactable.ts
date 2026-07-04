@@ -9,6 +9,8 @@ export class Interactable extends Phaser.GameObjects.Rectangle {
   readonly kind: InteractableType;
   readonly objId: string;
   readonly targetId?: string;
+  /** checkpoint 是否已啟用（避免重複觸發） */
+  activated = false;
 
   constructor(
     scene: Phaser.Scene,

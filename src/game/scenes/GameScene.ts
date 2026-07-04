@@ -8,6 +8,7 @@ import { CameraSystem } from "../systems/CameraSystem";
 import { GameState } from "../systems/GameState";
 import { CheckpointSystem } from "../systems/CheckpointSystem";
 import { InteractionSystem } from "../systems/InteractionSystem";
+import { CollisionSystem } from "../systems/CollisionSystem";
 import { Hazard } from "../entities/Hazard";
 import { MovingPlatform } from "../entities/MovingPlatform";
 import { TEST_LEVEL } from "../data/levels";
@@ -27,9 +28,8 @@ export class GameScene extends Phaser.Scene {
   private gameState!: GameState;
   private checkpoints!: CheckpointSystem;
   private interactions!: InteractionSystem;
+  private collisions!: CollisionSystem;
   private platforms: MovingPlatform[] = [];
-  /** 掉落深淵的死亡判定 y（px） */
-  private deathY = Number.MAX_SAFE_INTEGER;
 
   /** 上一幀是否在地面，用於偵測落地瞬間 */
   private wasGrounded = false;
@@ -44,30 +44,21 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor("#1a1a24");
 
     const level = new LevelSystem().build(this, TEST_LEVEL);
-    this.deathY = level.worldPx.height + u(3);
 
     // 玩家
     this.player = new Player(this, level.spawnPx.x, level.spawnPx.y);
-    this.physics.add.collider(this.player, level.solids);
 
     // 狀態與系統
     this.gameState = new GameState(this);
     this.checkpoints = new CheckpointSystem(level.spawnPx);
-    this.interactions = new InteractionSystem(this, this.player, this.gameState, this.checkpoints);
+
+    // 建立互動物件（僅建立，不含碰撞判斷）
+    this.interactions = new InteractionSystem(this);
     this.interactions.build(TEST_LEVEL);
 
-    // 陷阱：接觸即死亡重生
-    for (const cfg of TEST_LEVEL.hazards ?? []) {
-      const hazard = new Hazard(this, cfg);
-      this.physics.add.overlap(this.player, hazard, () => this.killPlayer());
-    }
-
-    // 移動平台：與玩家碰撞，站上去穩定跟隨
-    this.platforms = (TEST_LEVEL.platforms ?? []).map((cfg) => {
-      const platform = new MovingPlatform(this, cfg);
-      this.physics.add.collider(this.player, platform);
-      return platform;
-    });
+    // 陷阱與移動平台（僅建立實體）
+    const hazards = (TEST_LEVEL.hazards ?? []).map((cfg) => new Hazard(this, cfg));
+    this.platforms = (TEST_LEVEL.platforms ?? []).map((cfg) => new MovingPlatform(this, cfg));
 
     // 能力系統：預設先開啟能力方便測試（正式解鎖留待 Phase 15 pickup）
     this.abilities = new AbilitySystem(this);
@@ -77,6 +68,19 @@ export class GameScene extends Phaser.Scene {
     this.abilities.unlock("wall_jump");
 
     this.controller = new PlayerController(this, this.player, this.abilities);
+
+    // 所有碰撞判斷集中於此
+    this.collisions = new CollisionSystem(this, {
+      player: this.player,
+      solids: level.solids,
+      platforms: this.platforms,
+      hazards,
+      interactions: this.interactions,
+      gameState: this.gameState,
+      checkpoints: this.checkpoints,
+      deathY: level.worldPx.height + u(3),
+      onPlayerDied: () => this.killPlayer(),
+    });
 
     // 相機：平滑跟隨 + 死區 + 震動（世界邊界已由 LevelSystem 設定，相機自動夾在其中）
     this.camera = new CameraSystem(this, this.player);
@@ -94,7 +98,9 @@ export class GameScene extends Phaser.Scene {
   update(_time: number, delta: number): void {
     const wasGroundedBefore = this.wasGrounded;
     this.controller.update(delta);
-    this.interactions.update();
+
+    // 所有碰撞判斷（掉落死亡、陷阱、互動）集中於此
+    this.collisions.update();
 
     // 移動平台：更新位移邏輯（玩家跟隨由 Arcade 內建摩擦處理）
     for (const platform of this.platforms) {
@@ -103,11 +109,6 @@ export class GameScene extends Phaser.Scene {
 
     const body = this.player.body as Phaser.Physics.Arcade.Body;
     const grounded = this.player.isGrounded;
-
-    // 掉落深淵 → 死亡重生
-    if (this.player.y > this.deathY) {
-      this.killPlayer();
-    }
 
     // 落地重擊 → 輕微震動
     if (grounded && !wasGroundedBefore && this.lastAirFallVy > u(CAMERA_CONFIG.hardLandingVyUnit)) {
