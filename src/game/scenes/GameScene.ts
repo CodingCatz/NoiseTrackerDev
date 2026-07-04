@@ -4,7 +4,10 @@ import { Player } from "../entities/Player";
 import { PlayerController } from "../systems/PlayerController";
 import { AbilitySystem } from "../systems/AbilitySystem";
 import { LevelSystem } from "../systems/LevelSystem";
+import { CameraSystem } from "../systems/CameraSystem";
 import { MVP_LEVEL } from "../data/levels";
+import { CAMERA_CONFIG } from "../data/cameraConfig";
+import { u } from "../utils/units";
 
 /**
  * GameScene：組裝關卡、玩家與各系統並驅動控制器。
@@ -15,6 +18,11 @@ export class GameScene extends Phaser.Scene {
   private player!: Player;
   private controller!: PlayerController;
   private abilities!: AbilitySystem;
+  private camera!: CameraSystem;
+  /** 上一幀是否在地面，用於偵測落地瞬間 */
+  private wasGrounded = false;
+  /** 上一幀在空中的下落速度（px/s），落地時用來判定是否重擊 */
+  private lastAirFallVy = 0;
 
   constructor() {
     super(SceneKeys.Game);
@@ -39,8 +47,8 @@ export class GameScene extends Phaser.Scene {
 
     this.controller = new PlayerController(this, this.player, this.abilities);
 
-    // 相機基本跟隨（Phase 10 會換成 CameraSystem 加入平滑／死區／震動）
-    this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
+    // 相機：平滑跟隨 + 死區 + 震動（世界邊界已由 LevelSystem 設定，相機自動夾在其中）
+    this.camera = new CameraSystem(this, this.player);
 
     // UI 以獨立 Scene 平行疊在遊戲畫面上方
     this.scene.launch(SceneKeys.UI);
@@ -53,6 +61,17 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
+    const wasGroundedBefore = this.wasGrounded;
     this.controller.update(delta);
+
+    const body = this.player.body as Phaser.Physics.Arcade.Body;
+    const grounded = this.player.isGrounded;
+
+    // 落地重擊 → 輕微震動
+    if (grounded && !wasGroundedBefore && this.lastAirFallVy > u(CAMERA_CONFIG.hardLandingVyUnit)) {
+      this.camera.smallShake();
+    }
+    if (!grounded) this.lastAirFallVy = body.velocity.y;
+    this.wasGrounded = grounded;
   }
 }

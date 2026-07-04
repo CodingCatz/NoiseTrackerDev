@@ -5,6 +5,12 @@
 
 ## [Unreleased]
 
+### Phase 10：CameraSystem
+
+- 新增 `systems/CameraSystem.ts`：平滑跟隨（lerp 0.08）、死區（4×2.5 units）、`smallShake` / `largeShake`。
+- 新增 `data/cameraConfig.ts` 集中相機參數；相機自動夾在世界邊界內，不超出關卡。
+- GameScene 改用 CameraSystem 取代基本 startFollow，並在落地重擊（下落 > 10 unit/s）時觸發輕微震動。
+
 ### Phase 9：Tilemap／關卡資料架構
 
 - 新增 `systems/LevelSystem.ts`：依 `levels.ts` 生成地形、物件標記，並設定世界與相機邊界。
