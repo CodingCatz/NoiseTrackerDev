@@ -15,6 +15,8 @@ import { MovingPlatform } from "../entities/MovingPlatform";
 import { TUTORIAL_LEVEL } from "../data/levels";
 import { CAMERA_CONFIG } from "../data/cameraConfig";
 import { u } from "../utils/units";
+import { burst, fadeIn } from "../utils/effects";
+import { Sfx } from "../utils/sfx";
 
 /**
  * GameScene：組裝關卡、玩家與各系統並驅動控制器。
@@ -31,6 +33,7 @@ export class GameScene extends Phaser.Scene {
   private interactions!: InteractionSystem;
   private collisions!: CollisionSystem;
   private debug!: DebugOverlay;
+  private sfx!: Sfx;
   private platforms: MovingPlatform[] = [];
 
   /** 上一幀是否在地面，用於偵測落地瞬間 */
@@ -92,6 +95,9 @@ export class GameScene extends Phaser.Scene {
     // Debug overlay（F3 開關，預設關閉）
     this.debug = new DebugOverlay(this);
 
+    // 音效掛勾（目前無音檔，安靜跳過）
+    this.sfx = new Sfx(this);
+
     // UI 以獨立 Scene 平行疊在遊戲畫面上方
     this.scene.launch(SceneKeys.UI);
 
@@ -121,14 +127,25 @@ export class GameScene extends Phaser.Scene {
     if (!grounded) this.lastAirFallVy = body.velocity.y;
     this.wasGrounded = grounded;
 
+    // 依狀態套用玩家視覺
+    this.player.applyStateVisual(this.controller.currentState);
+
     this.debug.update(this.player, this.controller, this.abilities, this.game.loop.actualFps);
   }
 
   /** 死亡：計次、震動並重生到最近 checkpoint（本專案無 Game Over，死亡只重生） */
   private killPlayer(): void {
+    // 死亡碎裂效果於原地噴發
+    burst(this, this.player.x, this.player.y, 0xff5a5a);
+    this.sfx.play("death");
+
     this.gameState.addDeath();
     this.camera.largeShake();
     this.checkpoints.respawn(this.player);
+
+    // 重生淡入
+    fadeIn(this.player);
+
     this.lastAirFallVy = 0;
     this.wasGrounded = false;
   }
@@ -137,6 +154,7 @@ export class GameScene extends Phaser.Scene {
   private win(): void {
     if (this.gameState.isVictory) return; // 避免重複觸發
     this.gameState.win();
+    this.sfx.play("goal");
     const elapsedMs = this.time.now - this.startTime;
     this.scene.stop(SceneKeys.UI);
     this.scene.start(SceneKeys.GameOver, {

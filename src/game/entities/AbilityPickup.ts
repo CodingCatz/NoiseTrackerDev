@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import type { AbilityId } from "../types/AbilityTypes";
 import { ABILITY_PICKUP_COLORS } from "../data/abilities";
+import { pulseLoop } from "../utils/effects";
 
 /**
  * AbilityPickup：能力道具，以圓形呈現，顏色依能力不同。
@@ -16,5 +17,8 @@ export class AbilityPickup extends Phaser.GameObjects.Arc {
     scene.add.existing(this);
     scene.physics.add.existing(this, true);
     this.abilityId = abilityId;
+
+    // 持續脈動，明顯是可撿的道具
+    pulseLoop(this, 1.2, 700);
   }
 }

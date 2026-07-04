@@ -9,6 +9,7 @@ import { AbilitySystem } from "./AbilitySystem";
 import { GameState } from "./GameState";
 import { CheckpointSystem } from "./CheckpointSystem";
 import { INTERACTABLE_META } from "../data/interactables";
+import { popOnce } from "../utils/effects";
 import { u } from "../utils/units";
 
 /** CollisionSystem 發送的事件名稱 */
@@ -145,6 +146,7 @@ export class CollisionSystem {
       if (this.scene.physics.overlap(this.refs.player, sw.entity)) {
         sw.on = !sw.on;
         sw.entity.setFillStyle(sw.on ? 0x7dffa8 : INTERACTABLE_META.switch.color, 0.95);
+        popOnce(sw.entity, 1.3, 160);
         if (sw.targetId) {
           const door = this.refs.interactions.doors.get(sw.targetId);
           if (door) {

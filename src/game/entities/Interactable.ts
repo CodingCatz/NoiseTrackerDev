@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import type { InteractableType } from "../types/LevelTypes";
+import { popOnce } from "../utils/effects";
 
 /**
  * Interactable：共用的互動物件實體（key／door／switch／checkpoint／goal）。
@@ -34,17 +35,25 @@ export class Interactable extends Phaser.GameObjects.Rectangle {
     this.targetId = targetId;
   }
 
-  /** 啟用狀態的視覺變化（如 checkpoint 亮起） */
+  /** 啟用狀態的視覺變化（如 checkpoint 亮起）＋ 彈跳回饋 */
   markActivated(color: number): void {
     this.setFillStyle(color, 0.95);
     this.setStrokeStyle(4, 0xffffff);
+    popOnce(this, 1.4, 200);
   }
 
-  /** 開啟（門）：關閉碰撞並隱藏 */
+  /** 開啟（門）：立即關閉碰撞讓玩家可通過，視覺淡出 */
   open(): void {
     const body = this.body as Phaser.Physics.Arcade.StaticBody;
     body.enable = false;
-    this.setVisible(false);
+    this.scene.tweens.add({
+      targets: this,
+      alpha: 0,
+      scaleX: 0.4,
+      duration: 200,
+      ease: "Quad.out",
+      onComplete: () => this.setVisible(false),
+    });
   }
 
   /** 關閉（門）：恢復碰撞並顯示 */
@@ -52,6 +61,8 @@ export class Interactable extends Phaser.GameObjects.Rectangle {
     const body = this.body as Phaser.Physics.Arcade.StaticBody;
     body.enable = true;
     this.setVisible(true);
+    this.setAlpha(1);
+    this.setScale(1);
   }
 
   /** 門目前是否為開啟（可通過）狀態 */

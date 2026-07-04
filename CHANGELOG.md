@@ -5,6 +5,14 @@
 
 ## [Unreleased]
 
+### Phase 18：視覺回饋與動畫 placeholder
+
+- 新增 `utils/effects.ts`（fadeIn／burst／pulseLoop／popOnce）與 `utils/sfx.ts`（音效掛勾，無音檔時安靜跳過、不硬塞無效路徑）。
+- 玩家依 PlayerState 套用顏色（idle／run／jump／fall／dash／wall_slide 各不同）。
+- 死亡：原地碎裂噴發；重生：淡入。
+- 能力道具持續脈動；checkpoint 亮起與開關切換有彈跳回饋；門開啟改為淡出。
+- 死亡／通關保留音效呼叫點（目前無音檔，不產生載入錯誤）。
+
 ### Phase 17：Debug Overlay
 
 - 新增 `systems/DebugOverlay.ts`：按 F3 開關（預設關閉），顯示 state、座標、速度（unit／unit-s）、grounded、touchingWall、wallSliding、coyote／buffer 計時、airJumpsUsed／airDashesUsed、dashReady、FPS。
