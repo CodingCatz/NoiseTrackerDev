@@ -5,6 +5,14 @@
 
 ## [Unreleased]
 
+### Phase 6：二段跳（AbilitySystem）
+
+- 新增 `systems/AbilitySystem.ts`：集中管理能力解鎖與滯空次數，解鎖狀態寫入 registry 供 UI 讀取。
+- PlayerController 加入二段跳：超出 coyote 視窗後於空中再按跳 → 以 `doubleJumpVelocityUnit` 起跳，落地重置。
+- GameScene 建立 AbilitySystem 並預設解鎖 `double_jump`（方便測試，正式解鎖留待 Phase 15）。
+- UIScene 讀 registry 顯示已解鎖能力（如 `Double Jump`），能力變動即時刷新。
+- 能力狀態不寫死在 Player；尚未實作 Dash（Phase 7）。
+
 ### Phase 5：Coyote Time 與 Jump Buffer
 
 - PlayerController 加入 Coyote Time（離地後 `coyoteTimeMs` 內仍可起跳）與 Jump Buffer（落地前 `jumpBufferMs` 內預按自動起跳），數值讀自 playerPhysics.ts。

@@ -4,6 +4,7 @@ import { GAME_WIDTH, GAME_HEIGHT } from "../config/gameConfig";
 import { u } from "../utils/units";
 import { Player } from "../entities/Player";
 import { PlayerController } from "../systems/PlayerController";
+import { AbilitySystem } from "../systems/AbilitySystem";
 
 /**
  * GameScene：組裝玩家、地面與測試平台並驅動控制器。
@@ -13,6 +14,7 @@ import { PlayerController } from "../systems/PlayerController";
 export class GameScene extends Phaser.Scene {
   private player!: Player;
   private controller!: PlayerController;
+  private abilities!: AbilitySystem;
 
   constructor() {
     super(SceneKeys.Game);
@@ -92,6 +94,11 @@ export class GameScene extends Phaser.Scene {
     // 起始位置 x = 2 units，稍高於地面讓其落下（示範不穿地）
     this.player = new Player(this, u(2), GAME_HEIGHT - u(4));
     this.physics.add.collider(this.player, solids);
-    this.controller = new PlayerController(this, this.player);
+
+    // 能力系統：Phase 6 預設先開啟二段跳方便測試（正式解鎖留待 Phase 15 pickup）
+    this.abilities = new AbilitySystem(this);
+    this.abilities.unlock("double_jump");
+
+    this.controller = new PlayerController(this, this.player, this.abilities);
   }
 }

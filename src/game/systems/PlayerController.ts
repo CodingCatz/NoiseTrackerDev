@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { Player } from "../entities/Player";
-import { PLAYER_PHYSICS } from "../data/playerPhysics";
+import { AbilitySystem } from "./AbilitySystem";
+import { PLAYER_PHYSICS, DOUBLE_JUMP_CONFIG } from "../data/playerPhysics";
 import { u } from "../utils/units";
 import { moveTowards } from "../utils/math";
 
@@ -11,6 +12,7 @@ import { moveTowards } from "../utils/math";
  */
 export class PlayerController {
   private readonly player: Player;
+  private readonly abilities: AbilitySystem;
   private readonly cursors: Phaser.Types.Input.Keyboard.CursorKeys;
   private readonly keyA: Phaser.Input.Keyboard.Key;
   private readonly keyD: Phaser.Input.Keyboard.Key;
@@ -36,8 +38,9 @@ export class PlayerController {
     return Math.max(0, this.jumpBufferTimer);
   }
 
-  constructor(scene: Phaser.Scene, player: Player) {
+  constructor(scene: Phaser.Scene, player: Player, abilities: AbilitySystem) {
     this.player = player;
+    this.abilities = abilities;
 
     const keyboard = scene.input.keyboard;
     if (!keyboard) {
@@ -92,17 +95,26 @@ export class PlayerController {
     const jumpReleased = !jumpHeld && this.prevJumpHeld;
     this.prevJumpHeld = jumpHeld;
 
+    // 踩地時重置滯空次數（二段跳 / 衝刺）
+    if (grounded) this.abilities.resetAirState();
+
     // 更新計時器：踩地時充滿 coyote；按下瞬間充滿 buffer
     this.coyoteTimer = grounded ? p.coyoteTimeMs : this.coyoteTimer - deltaMs;
     this.jumpBufferTimer = jumpPressed ? p.jumpBufferMs : this.jumpBufferTimer - deltaMs;
 
-    // 有緩衝中的跳躍輸入，且仍在 coyote 視窗內 → 起跳
+    // 有緩衝中的跳躍輸入，且仍在 coyote 視窗內 → 地面（或 coyote）起跳
     if (this.jumpBufferTimer > 0 && this.coyoteTimer > 0) {
       body.setVelocityY(-u(p.jumpVelocityUnit));
       this.isJumpRising = true;
       // 消耗掉，避免同一次輸入或 coyote 觸發二次跳
       this.jumpBufferTimer = 0;
       this.coyoteTimer = 0;
+    } else if (jumpPressed && this.abilities.canAirJump()) {
+      // 已超出 coyote 視窗、於空中再次按跳 → 二段跳
+      body.setVelocityY(-u(DOUBLE_JUMP_CONFIG.doubleJumpVelocityUnit));
+      this.abilities.useAirJump();
+      this.isJumpRising = true;
+      this.jumpBufferTimer = 0;
     }
 
     // 提早放開：削減仍在上升的速度
