@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { SceneKeys, TextureKeys } from "../config/sceneKeys";
 import { u } from "../utils/units";
+import { runDataValidation } from "../utils/validateData";
 
 /**
  * BootScene：載入前置資源並以 graphics 產生 placeholder 貼圖，
@@ -12,6 +13,8 @@ export class BootScene extends Phaser.Scene {
   }
 
   create(): void {
+    // 啟動時驗證物理／關卡資料，數值填錯會在 console 提早警告
+    runDataValidation();
     this.createPlaceholderTextures();
     this.scene.start(SceneKeys.Menu);
   }

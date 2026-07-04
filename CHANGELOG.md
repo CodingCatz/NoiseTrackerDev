@@ -5,6 +5,13 @@
 
 ## [Unreleased]
 
+### Phase 2：資料驅動的物理參數
+
+- 建立型別 `src/game/types/`：PhysicsTypes、AbilityTypes、PlayerTypes、LevelTypes、GameTypes。
+- 建立資料檔 `src/game/data/`：**playerPhysics.ts（手感調參中樞，跑速／跳高／重力集中於此）**、abilities.ts、interactables.ts、tiles.ts、levels.ts。
+- 建立 `utils/validateData.ts`，檢查物理／關卡數值合理性（含 jumpVelocity ≈ sqrt(2·g·h) 驗證），由 BootScene 啟動時呼叫。
+- 尚未把物理數值接進玩家控制（留待 Phase 3 起）。
+
 ### Phase 1：Scene 架構
 
 - 新增 BootScene、MenuScene、GameScene、UIScene、GameOverScene 五個場景（`src/game/scenes/`）。
