@@ -1,0 +1,19 @@
+{
+  "name": "noise-tracker-dev",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "FHD 2D Precision Platformer (Celeste-like) built with Vite + TypeScript + Phaser",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "phaser": "^3.90.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vite": "^7.1.9"
+  }
+}
