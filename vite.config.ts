@@ -1,8 +1,11 @@
 import { defineConfig } from "vite";
 
-// GitHub Pages 的 base path 會在 Phase 20 部署階段補上，這裡先維持根路徑。
+// GitHub Pages 部署於 https://<user>.github.io/<repo>/，需設定對應 base path。
+// 在 GitHub Actions 中 GITHUB_REPOSITORY = "owner/repo"，取 repo 當 base；本機開發用根路徑。
 export default defineConfig({
-  base: "/",
+  base: process.env.GITHUB_REPOSITORY
+    ? `/${process.env.GITHUB_REPOSITORY.split("/")[1]}/`
+    : "/",
   build: {
     target: "es2020",
     outDir: "dist",

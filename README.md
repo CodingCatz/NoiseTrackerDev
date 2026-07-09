@@ -2,13 +2,15 @@
 
 FHD 2D 精準平台跳躍遊戲（**Precision Platformer**，Celeste-like）的開發專案。
 
-以 **Phaser 4 + Vite + TypeScript**（Arcade 物理）製作，FHD 1920×1080 邏輯解析度，
+以 **Phaser + Vite + TypeScript**（Arcade 物理）製作，FHD 1920×1080 邏輯解析度，
 透過 **GitHub Actions** 自動部署到 GitHub Pages。
 
-> 目前狀態：Phase 0 完成（Vite + TypeScript + Phaser 專案底座與 FHD 顯示設定，尚無玩法）。
-> 完整規格見
-> [`ClaudeCode_FHD_Precision_Platformer_SPEC.md`](./ClaudeCode_FHD_Precision_Platformer_SPEC.md)，
-> 程式碼依該文件的 Phase 0–21 依序實作。
+> **遊戲網址：** https://codingcatz.github.io/NoiseTrackerDev/
+>
+> 目前狀態：核心玩法完成（移動／可變跳／二段跳／衝刺／牆滑牆跳、資料驅動關卡、
+> 鑰匙門開關、Checkpoint 重生、陷阱、移動平台、能力拾取教學關、通關流程、Debug overlay、
+> 手機觸控、GitHub Pages 自動部署）。完整規格見
+> [`ClaudeCode_FHD_Precision_Platformer_SPEC.md`](./ClaudeCode_FHD_Precision_Platformer_SPEC.md)。
 
 ## 遊戲類型
 
@@ -41,6 +43,15 @@ npm run dev      # 開發伺服器
 npm run build    # 產出 dist/
 npm run preview  # 預覽 build 結果
 ```
+
+## 部署（GitHub Pages）
+
+推送到 `main` 時，[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) 會自動 build 並部署 `dist/` 到 GitHub Pages。
+
+- `vite.config.ts` 會在 GitHub Actions 環境依 `GITHUB_REPOSITORY` 自動設定 base path（`/NoiseTrackerDev/`），本機開發用根路徑。
+- 使用 GitHub 官方 Pages actions（`configure-pages` / `upload-pages-artifact` / `deploy-pages`），不需額外 token。
+- **首次啟用**：到 GitHub repo **Settings → Pages → Build and deployment → Source** 選 **GitHub Actions**，之後每次 push `main` 即自動更新。
+- 部署完成後可於 **Actions** 分頁查看進度，網址：https://codingcatz.github.io/NoiseTrackerDev/
 
 ## 文件
 

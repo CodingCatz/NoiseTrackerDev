@@ -5,6 +5,12 @@
 
 ## [Unreleased]
 
+### Phase 20：GitHub Pages 自動部署
+
+- 新增 `.github/workflows/deploy.yml`：push 到 `main` 自動 build 並以官方 Pages actions 部署 `dist/`（`configure-pages` / `upload-pages-artifact` / `deploy-pages`，permissions：contents read、pages write、id-token write）。
+- `vite.config.ts` 依 `GITHUB_REPOSITORY` 自動設定 base path（GitHub Actions 環境為 `/NoiseTrackerDev/`，本機為 `/`）。
+- README 補上部署說明與遊戲網址（首次需在 repo Settings → Pages → Source 選 GitHub Actions）。
+
 ### Phase 19：Mobile 觸控操作（選配）
 
 - 新增 `utils/platform.ts`（`isTouchLikely`：觸控裝置或視窗寬 < 900 才判定為手機／小螢幕）。
