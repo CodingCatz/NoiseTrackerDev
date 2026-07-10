@@ -3,35 +3,34 @@ import { SceneKeys } from "../config/sceneKeys";
 import { GAME_WIDTH } from "../config/gameConfig";
 import { REGISTRY_UNLOCKED_ABILITIES } from "../systems/AbilitySystem";
 import { REGISTRY_KEY_COUNT, REGISTRY_DEATHS } from "../systems/GameState";
-import { ABILITY_PICKUP_COLORS } from "../data/abilities";
-import { isTouchLikely } from "../utils/platform";
+import { SKILL_ICONS, HUD_ABILITY_IDS, KEY_ICON, KEY_TINT } from "../data/abilities";
 import type { AbilityId } from "../types/AbilityTypes";
 
-/** HUD 上顯示的能力圖示（依取得順序，key 為桌機操作提示） */
-const HUD_ABILITIES: { id: AbilityId; label: string; key: string }[] = [
-  { id: "double_jump", label: "二段跳", key: "Space" },
-  { id: "dash", label: "衝刺", key: "Shift" },
-  { id: "wall_jump", label: "牆跳", key: "Space+牆" },
-];
+/** 能力圓框半徑與剪影目標視覺大小（剪影最長邊縮到此 px，各姿勢一致） */
+const ICON_FRAME_RADIUS = 44;
+const ICON_CONTENT_TARGET = 62;
+/** HUD 圖示列的垂直位置與水平間距 */
+const ROW_Y = 110;
+const ICON_GAP = 156;
 
-/** 單一能力圖示（圓形＋標籤），未取得時暗、取得後亮燈 */
+/** 單一能力圖示（白細圓框＋人形剪影，全圖說無文字），未取得時暗、取得後亮燈 */
 interface AbilityIcon {
   id: AbilityId;
-  dot: Phaser.GameObjects.Arc;
-  label: Phaser.GameObjects.Text;
+  frame: Phaser.GameObjects.Arc;
+  sprite: Phaser.GameObjects.Image;
 }
 
 /**
- * UIScene：平行疊在 GameScene 上的 HUD。
- * 鑰匙以白點呈現；能力以圖示呈現（取得後亮燈）；並顯示死亡次數。全部讀 registry 即時刷新。
+ * UIScene：平行疊在 GameScene 上的 HUD，全部以圖示表達、無文字說明。
+ * 能力以人形剪影圓框置中於畫面中上方（取得後亮燈）；鑰匙以鑰匙圖示點亮表示（圖示載入後才顯示）。
+ * 死亡次數保留於右上。全部讀 registry 即時刷新。
  */
 export class UIScene extends Phaser.Scene {
   private deathText!: Phaser.GameObjects.Text;
-  private keyDots: Phaser.GameObjects.Arc[] = [];
   private abilityIcons: AbilityIcon[] = [];
+  private keyIcons: Phaser.GameObjects.Image[] = [];
 
   private readonly pad = 32;
-  private readonly keyDotStartX = 130;
 
   constructor() {
     super(SceneKeys.UI);
@@ -40,35 +39,14 @@ export class UIScene extends Phaser.Scene {
   create(): void {
     const pad = this.pad;
 
-    // 鑰匙標籤（白點由 refresh 依數量產生）
-    this.add.text(pad, pad, "鑰匙", {
-      fontFamily: "sans-serif",
-      fontSize: "30px",
-      color: "#ffffff",
-    });
+    this.buildAbilityIcons();
 
-    // 能力圖示列
-    this.add.text(pad, pad + 56, "能力", {
-      fontFamily: "sans-serif",
-      fontSize: "26px",
-      color: "#9aa4d0",
-    });
-    this.buildAbilityIcons(pad + 110, pad + 56 + 18);
-
-    // 死亡次數（右上）
+    // 死亡次數（右上，唯一保留的數值顯示）
     this.deathText = this.add
       .text(GAME_WIDTH - pad, pad, "", {
         fontFamily: "sans-serif",
         fontSize: "28px",
         color: "#9aa4d0",
-      })
-      .setOrigin(1, 0);
-
-    this.add
-      .text(GAME_WIDTH - pad, pad + 44, "E 互動 / G 模擬通關 / F3 除錯", {
-        fontFamily: "sans-serif",
-        fontSize: "22px",
-        color: "#5a627e",
       })
       .setOrigin(1, 0);
 
@@ -78,23 +56,22 @@ export class UIScene extends Phaser.Scene {
     this.bind(REGISTRY_UNLOCKED_ABILITIES);
   }
 
-  /** 建立能力圖示（初始為暗）；桌機在標籤附上鍵盤提示 */
-  private buildAbilityIcons(startX: number, y: number): void {
-    const gap = 190;
-    const showKeyHint = !isTouchLikely();
-    HUD_ABILITIES.forEach((a, i) => {
-      const x = startX + i * gap;
-      const color = ABILITY_PICKUP_COLORS[a.id] ?? 0xffffff;
-      const dot = this.add.circle(x, y, 16, color);
-      const text = showKeyHint ? `${a.label} [${a.key}]` : a.label;
-      const label = this.add
-        .text(x + 26, y, text, {
-          fontFamily: "sans-serif",
-          fontSize: "22px",
-          color: "#ffffff",
-        })
-        .setOrigin(0, 0.5);
-      this.abilityIcons.push({ id: a.id, dot, label });
+  /** 能力人形剪影圓框，靠攏置中於畫面中上方，無文字 */
+  private buildAbilityIcons(): void {
+    const n = HUD_ABILITY_IDS.length;
+    const startX = GAME_WIDTH / 2 - ((n - 1) * ICON_GAP) / 2;
+    HUD_ABILITY_IDS.forEach((id, i) => {
+      const x = startX + i * ICON_GAP;
+      const meta = SKILL_ICONS[id];
+
+      const frame = this.add
+        .circle(x, ROW_Y, ICON_FRAME_RADIUS, 0xffffff, 0)
+        .setStrokeStyle(3, 0xffffff, 0.9);
+
+      // 純白剪影：以內容最長邊正規化到一致視覺大小，runtime 以 tint 控制亮／暗
+      const sprite = this.add.image(x, ROW_Y, meta.key).setScale(ICON_CONTENT_TARGET / meta.contentLongest);
+
+      this.abilityIcons.push({ id, frame, sprite });
     });
   }
 
@@ -114,26 +91,38 @@ export class UIScene extends Phaser.Scene {
     const unlocked = (this.registry.get(REGISTRY_UNLOCKED_ABILITIES) as AbilityId[] | undefined) ?? [];
 
     this.deathText.setText(`死亡次數：${deaths}`);
-    this.refreshKeyDots(keys);
+    this.refreshKeyIcons(keys);
     this.refreshAbilityIcons(unlocked);
   }
 
-  /** 依鑰匙數量重建白點 */
-  private refreshKeyDots(count: number): void {
-    for (const dot of this.keyDots) dot.destroy();
-    this.keyDots = [];
+  /**
+   * 依鑰匙數量點亮鑰匙圖示（每把一顆，染金黃）。
+   * 鑰匙圖尚未載入（Codex 交付前）時不顯示；圖示到位後自動生效。
+   */
+  private refreshKeyIcons(count: number): void {
+    for (const icon of this.keyIcons) icon.destroy();
+    this.keyIcons = [];
+    if (!this.textures.exists(KEY_ICON.key)) return;
+
+    const scale = (ICON_CONTENT_TARGET * 0.8) / KEY_ICON.contentLongest;
+    const gap = 52;
+    const startX = GAME_WIDTH / 2 - ((count - 1) * gap) / 2;
     for (let i = 0; i < count; i++) {
-      this.keyDots.push(this.add.circle(this.keyDotStartX + i * 24, this.pad + 15, 8, 0xffffff));
+      this.keyIcons.push(
+        this.add
+          .image(startX + i * gap, ROW_Y + ICON_FRAME_RADIUS + 40, KEY_ICON.key)
+          .setScale(scale)
+          .setTint(KEY_TINT)
+      );
     }
   }
 
-  /** 已取得的能力亮燈（白框＋全亮），未取得的變暗 */
+  /** 已取得的能力亮燈（白框＋剪影全亮），未取得的變暗 */
   private refreshAbilityIcons(unlocked: AbilityId[]): void {
     for (const icon of this.abilityIcons) {
       const on = unlocked.includes(icon.id);
-      icon.dot.setAlpha(on ? 1 : 0.25);
-      icon.dot.setStrokeStyle(on ? 3 : 0, 0xffffff);
-      icon.label.setColor(on ? "#ffffff" : "#5a627e");
+      icon.frame.setStrokeStyle(3, 0xffffff, on ? 0.9 : 0.25);
+      icon.sprite.setAlpha(on ? 1 : 0.35).setTint(on ? 0xffffff : 0x5a627e);
     }
   }
 }

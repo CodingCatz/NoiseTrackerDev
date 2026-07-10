@@ -2,14 +2,22 @@ import Phaser from "phaser";
 import { SceneKeys, TextureKeys } from "../config/sceneKeys";
 import { u } from "../utils/units";
 import { runDataValidation } from "../utils/validateData";
+import { ICON_PRELOAD } from "../data/abilities";
 
 /**
  * BootScene：載入前置資源並以 graphics 產生 placeholder 貼圖，
- * 完成後切到 MenuScene。此階段尚無真實美術素材。
+ * 完成後切到 MenuScene。玩家／地面仍為 placeholder；動作技能剪影為真實素材。
  */
 export class BootScene extends Phaser.Scene {
   constructor() {
     super(SceneKeys.Boot);
+  }
+
+  /** 載入動作技能／基本跳的人形剪影 PNG（純白透明，供圓框內染色顯示） */
+  preload(): void {
+    for (const icon of ICON_PRELOAD) {
+      this.load.image(icon.key, `assets/ui/skills/${icon.file}`);
+    }
   }
 
   create(): void {

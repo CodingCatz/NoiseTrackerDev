@@ -3,6 +3,7 @@ import { Interactable } from "../entities/Interactable";
 import { AbilityPickup } from "../entities/AbilityPickup";
 import type { LevelConfig, LevelObjectConfig } from "../types/LevelTypes";
 import { INTERACTABLE_META } from "../data/interactables";
+import { KEY_ICON, KEY_TINT } from "../data/abilities";
 import { u } from "../utils/units";
 
 /** 開關與其連動目標 */
@@ -35,9 +36,12 @@ export class InteractionSystem {
   build(level: LevelConfig): void {
     for (const obj of level.objects) {
       switch (obj.type) {
-        case "key":
-          this.keys.push(this.spawn(obj, u(0.6), u(0.6)));
+        case "key": {
+          const key = this.spawn(obj, u(0.6), u(0.6));
+          this.decorateKey(key);
+          this.keys.push(key);
           break;
+        }
         case "checkpoint":
           this.checkpoints.push(this.spawn(obj, u(0.6), u(1.2)));
           break;
@@ -62,6 +66,32 @@ export class InteractionSystem {
           break;
       }
     }
+  }
+
+  /**
+   * 場上鑰匙改以鑰匙剪影（染金黃）呈現：隱藏原矩形（保留物理身體），
+   * 疊上鑰匙圖示並呼吸脈動；鑰匙被撿取（destroy）時連帶清掉圖示。
+   * 鑰匙圖未載入時保留原矩形外觀，不隱藏。
+   */
+  private decorateKey(key: Interactable): void {
+    if (!this.scene.textures.exists(KEY_ICON.key)) return;
+    key.setFillStyle(0xffffff, 0); // 矩形隱形，僅保留 overlap 用的物理身體
+
+    const cx = key.x;
+    const cy = key.y - u(0.6) / 2; // Interactable origin(0.5,1)，中心上移半高
+    const icon = this.scene.add
+      .image(cx, cy, KEY_ICON.key)
+      .setTint(KEY_TINT)
+      .setScale(u(0.75) / KEY_ICON.contentLongest);
+    this.scene.tweens.add({
+      targets: icon,
+      alpha: 0.55,
+      duration: 700,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.inOut",
+    });
+    key.once(Phaser.GameObjects.Events.DESTROY, () => icon.destroy());
   }
 
   /** 依物件設定與尺寸建立 Interactable */

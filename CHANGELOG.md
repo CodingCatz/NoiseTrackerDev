@@ -5,6 +5,20 @@
 
 ## [Unreleased]
 
+### HUD／觸控全面圖示化（人形剪影 + 半透光暈）
+
+- **動作技能人形剪影素材**：`public/assets/ui/skills/` 新增純白透明剪影 PNG（jump／double_jump／dash／wall_jump／wall_slide／ground_pound／key），全白便於 runtime `setTint` 染色、`setAlpha` 調透明。素材經跨 AI 派工（SBM 工單）由 Codex 以「內建作圖綠幕 → 本機去背」產出。
+- **HUD 能力列**：由彩色圓點改為「白細圓框 + 人形剪影」，並靠攏置中於畫面中上方；顯示 double_jump／dash／wall_slide，取得後亮燈（白框全亮）、未取得變暗（染灰半透）。
+- **全面去文字化**：移除「能力」「鑰匙」區塊標題與各圖示文字標籤，一律以圖示表達（死亡次數保留於右上）。
+- **鑰匙**：以鑰匙圖示（染金黃 `#ffd34e`）點亮表示，收集幾把亮幾顆；觸控 E 鈕即為鑰匙圖示。
+- **觸控動作鈕**：跳／衝／E 由文字改為半透光暈人形剪影（跳=jump、衝=dash、E=key），與方向箭頭同一視覺語言；按下提亮。
+- **場上道具圖示化**：能力道具改以對應能力的人形剪影呈現並染上能力色（藍／黃／綠）；場上鑰匙改以金黃鑰匙剪影呈現（隱形矩形保留 overlap 物理身體）。
+- **技術**：新增 `utils/glowTexture.ts`（以 canvas shadowBlur 將純白剪影烤成含柔光暈的貼圖，繞過 Phaser 3.90 失效的 postFX）；`data/abilities.ts` 新增剪影圖示登錄表（貼圖鍵 + 內容最長邊，用於一致縮放）。
+
+### 通關畫面：可點「重來」鈕
+
+- `GameOverScene` 原本僅靠鍵盤 `R` 重來，觸控裝置無 R 鍵形同失效；改為可點的「重來」鈕（觸控／滑鼠皆可），`R` 保留為桌機快捷。
+
 ### Phase 20：GitHub Pages 自動部署
 
 - 新增 `.github/workflows/deploy.yml`：push 到 `main` 自動 build 並以官方 Pages actions 部署 `dist/`（`configure-pages` / `upload-pages-artifact` / `deploy-pages`，permissions：contents read、pages write、id-token write）。
