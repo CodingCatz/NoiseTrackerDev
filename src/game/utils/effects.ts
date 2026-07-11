@@ -243,7 +243,7 @@ export function speedLines(
       .image(ax, ay, key)
       .setOrigin(0, 0.5)
       .setDisplaySize(lineLen, th)
-      .setRotation(angle + rand(0.14))
+      .setRotation(angle)
       .setTint(color)
       .setDepth(depth)
       .setAlpha(alpha * (0.75 + Math.random() * 0.35))
