@@ -43,7 +43,7 @@ export const NEON_CLIPS: Record<
   idle: { key: "neon-idle", texture: "neon_idle", file: "neon_idle.png", frames: 2, fps: 4, loop: true },
   turn: { key: "neon-turn", texture: "neon_turn", file: "neon_turn.png", frames: 2, fps: 12, loop: false },
   run: { key: "neon-run", texture: "neon_run", file: "neon_run.png", frames: 4, fps: 12, loop: true },
-  dash: { key: "neon-dash", texture: "neon_dash", file: "neon_dash.png", frames: 4, fps: 16, loop: false },
+  dash: { key: "neon-dash", texture: "neon_dash", file: "neon_dash.png", frames: 1, fps: 1, loop: true },
   jump_rise: { key: "neon-jump-rise", texture: "neon_jump_rise", file: "neon_jump_rise.png", frames: 1, fps: 1, loop: true },
   jump_fall: { key: "neon-jump-fall", texture: "neon_jump_fall", file: "neon_jump_fall.png", frames: 1, fps: 1, loop: true },
   land: { key: "neon-land", texture: "neon_land", file: "neon_land.png", frames: 3, fps: 16, loop: false },
