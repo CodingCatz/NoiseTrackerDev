@@ -5,6 +5,14 @@
 
 ## [Unreleased]
 
+### Neon cut-out 骨骼表演層（取代 AI 逐幀 strip 正式路線）
+
+- **背景**：AI 逐幀 strip 尺度飄移（忽大忽小）；跨 AI 評估結論為內建生圖無硬姿勢約束，CEO 拍板改走 cut-out rig（方案 A）。
+- 新增 `data/neonRig.ts`＋`systems/CutoutRig.ts`：Container＋4 部件（頭髮/軀幹/雙腿，由 `neon_idle.png` 幀 0 離線切件、羽化藏縫），同一固定骨架程序驅動，**尺度由 `RIG_SCALE` 常數鎖死、零飄移**；腳底錨定碰撞體底部。
+- 姿勢：idle（呼吸＋髮絲延遲微擺）、run（雙腿反相擺＋2×頻起伏的四相跨步＋前傾＋頭部跟隨）、jump/fall/dash/wall_slide/land（含落地擠壓）。
+- `PlayerAnimator` 改三段優先：cut-out rig（正式）→ AI strip（fallback，部件缺失時退回，遊戲不會壞）→ 休眠；控制器/碰撞體不變。
+- 資產：`public/assets/char/parts/neon_{head,torso,legL,legR}.png`。
+
 ### 觸控動作鈕依狀態即時反應
 
 - 觸控動作鈕（跳／衝／E）改為每幀依能力與使用情況刷新（`TouchControls.update`，由 GameScene 驅動；桌機無鈕時 no-op）：
