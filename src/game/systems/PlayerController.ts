@@ -91,6 +91,9 @@ export class PlayerController {
   get dashing(): boolean {
     return this.isDashing;
   }
+  get grounded(): boolean {
+    return this.player.isGrounded;
+  }
   get dashReady(): boolean {
     return this.dashCooldownTimer <= 0 && this.abilities.canAirDash();
   }

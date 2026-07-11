@@ -5,6 +5,14 @@
 
 ## [Unreleased]
 
+### 觸控動作鈕依狀態即時反應
+
+- 觸控動作鈕（跳／衝／E）改為每幀依能力與使用情況刷新（`TouchControls.update`，由 GameScene 驅動；桌機無鈕時 no-op）：
+  - **未取得的行為 → 隱藏並停用**：衝刺未解鎖、E 未持有鑰匙時，該鈕消失且不可點。
+  - **跳鈕動態換圖**：空中且尚可二段跳時，跳鈕圖示換成二段跳圖示（提示可再跳一次）。
+  - **已用完／不可用 → 染紅**：衝刺冷卻或空中衝刺用完、空中已無跳可用時，圓框與圖示染紅。
+- `PlayerController` 新增 `grounded` getter 供表演層外系統查詢。
+
 ### 角色動畫控制層（表演層／控制器分離）
 
 - 新增 `data/characterAnim.ts`：Neon 逐幀動畫的幀表契約（8 個 clip：idle/turn/run/dash/jump_rise/jump_fall/land/wall_slide，含幀數/fps/loop、cell 256、腳底基線 232），與共享 skill `sprite-animation-sheets` 及美術產圖規格一致。

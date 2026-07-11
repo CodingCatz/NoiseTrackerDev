@@ -1,5 +1,8 @@
 import Phaser from "phaser";
 import { VirtualInput } from "./VirtualInput";
+import { PlayerController } from "./PlayerController";
+import { AbilitySystem } from "./AbilitySystem";
+import { REGISTRY_KEY_COUNT } from "./GameState";
 import { isTouchLikely } from "../utils/platform";
 import { bakeGlowTexture } from "../utils/glowTexture";
 import { JUMP_ICON, SKILL_ICONS, KEY_ICON, type IconMeta } from "../data/abilities";
@@ -8,6 +11,15 @@ import { JUMP_ICON, SKILL_ICONS, KEY_ICON, type IconMeta } from "../data/abiliti
 const DEPTH_HIT = 9000;
 const DEPTH_VISUAL = 9001;
 const WHITE = 0xffffff;
+/** 已使用/不可用的按鈕染紅 */
+const RED = 0xff5a5a;
+
+/** 動態動作鈕的組成：圓框 + 光暈剪影 */
+interface ActionButton {
+  frame: Phaser.GameObjects.Arc;
+  glyph: Phaser.GameObjects.Image | null;
+  radius: number;
+}
 
 /** 方向箭頭：半透白＋光暈，按下時提亮 */
 const ARROW_ALPHA = 0.35;
@@ -31,7 +43,13 @@ export class TouchControls {
   /** 是否有實際建立按鈕（桌機為 false） */
   readonly active: boolean;
 
+  private readonly scene: Phaser.Scene;
+  private jumpBtn: ActionButton | null = null;
+  private dashBtn: ActionButton | null = null;
+  private keyBtn: ActionButton | null = null;
+
   constructor(scene: Phaser.Scene, virtual: VirtualInput) {
+    this.scene = scene;
     this.active = isTouchLikely();
     if (!this.active) return;
 
@@ -42,10 +60,67 @@ export class TouchControls {
     this.makeArrowButton(scene, 180, 900, 85, "left", (v) => (virtual.left = v));
     this.makeArrowButton(scene, 400, 900, 85, "right", (v) => (virtual.right = v));
 
-    // 右下：動作（白細圓框 + 半透光暈人形剪影；E 為鑰匙圖，待 Codex 交付前只顯示框）
-    this.makeActionHoldButton(scene, 1780, 900, 100, JUMP_ICON, (v) => (virtual.jump = v));
-    this.makeActionHoldButton(scene, 1560, 770, 80, SKILL_ICONS.dash, (v) => (virtual.dash = v));
-    this.makeActionTapButton(scene, 1560, 970, 70, KEY_ICON, () => virtual.pressInteract());
+    // 右下：動作鈕（白細圓框 + 半透光暈剪影）。狀態由 update() 依能力/使用情況即時刷新
+    this.jumpBtn = this.makeActionHoldButton(scene, 1780, 900, 100, JUMP_ICON, (v) => (virtual.jump = v));
+    this.dashBtn = this.makeActionHoldButton(scene, 1560, 770, 80, SKILL_ICONS.dash, (v) => (virtual.dash = v));
+    this.keyBtn = this.makeActionTapButton(scene, 1560, 970, 70, KEY_ICON, () => virtual.pressInteract());
+
+    // 預烤二段跳光暈貼圖，供跳鈕在可二段跳時換圖
+    if (scene.textures.exists(SKILL_ICONS.double_jump.key)) {
+      bakeGlowTexture(scene, SKILL_ICONS.double_jump.key, `${SKILL_ICONS.double_jump.key}-glow`);
+    }
+  }
+
+  /**
+   * 每幀刷新動作鈕狀態（桌機無鈕時直接跳過）：
+   * - 跳：可二段跳（空中且尚可再跳）換成二段跳圖；空中已無跳可用 → 染紅
+   * - 衝刺：未解鎖 → 隱藏；已解鎖但冷卻/用完 → 染紅
+   * - 鑰匙(E)：未持有鑰匙 → 隱藏
+   */
+  update(controller: PlayerController, abilities: AbilitySystem): void {
+    if (!this.active) return;
+
+    if (this.jumpBtn) {
+      const grounded = controller.grounded;
+      const canAir = abilities.canAirJump();
+      this.setGlyphIcon(this.jumpBtn, !grounded && canAir ? SKILL_ICONS.double_jump : JUMP_ICON);
+      const canJump = grounded || canAir || controller.coyoteRemainingMs > 0;
+      this.setButtonState(this.jumpBtn, true, canJump);
+    }
+
+    if (this.dashBtn) {
+      const unlocked = abilities.isUnlocked("dash");
+      this.setButtonState(this.dashBtn, unlocked, controller.dashReady);
+    }
+
+    if (this.keyBtn) {
+      const keys = (this.scene.registry.get(REGISTRY_KEY_COUNT) as number | undefined) ?? 0;
+      this.setButtonState(this.keyBtn, keys > 0, true);
+    }
+  }
+
+  /** 顯示/隱藏（連同停用命中）＋ 可用(白)／不可用(紅) 染色 */
+  private setButtonState(btn: ActionButton, visible: boolean, usable: boolean): void {
+    btn.frame.setVisible(visible);
+    if (btn.frame.input) btn.frame.input.enabled = visible;
+    btn.glyph?.setVisible(visible);
+
+    const color = usable ? WHITE : RED;
+    btn.frame.setStrokeStyle(FRAME_STROKE, color, FRAME_ALPHA);
+    btn.glyph?.setTint(color);
+  }
+
+  /** 切換鈕內剪影圖（跳鈕在一般跳／二段跳間切換）；貼圖未載入則不動 */
+  private setGlyphIcon(btn: ActionButton, icon: IconMeta): void {
+    if (!btn.glyph) return;
+    const glowKey = `${icon.key}-glow`;
+    if (!this.scene.textures.exists(glowKey)) {
+      if (!this.scene.textures.exists(icon.key)) return;
+      bakeGlowTexture(this.scene, icon.key, glowKey);
+    }
+    if (btn.glyph.texture.key !== glowKey) {
+      btn.glyph.setTexture(glowKey).setScale((btn.radius * 1.15) / icon.contentLongest);
+    }
   }
 
   // #region 方向箭頭
@@ -142,7 +217,7 @@ export class TouchControls {
     radius: number,
     icon: IconMeta,
     setHeld: (held: boolean) => void
-  ): void {
+  ): ActionButton {
     const frame = this.makeActionFrame(scene, x, y, radius);
     const glyph = this.makeButtonIcon(scene, x, y, radius, icon);
     frame.on("pointerdown", () => {
@@ -157,6 +232,7 @@ export class TouchControls {
     };
     frame.on("pointerup", release);
     frame.on("pointerout", release);
+    return { frame, glyph, radius };
   }
 
   /** 動作鈕（點擊型）：互動 E（鑰匙圖），按下觸發一次 */
@@ -167,7 +243,7 @@ export class TouchControls {
     radius: number,
     icon: IconMeta,
     onTap: () => void
-  ): void {
+  ): ActionButton {
     const frame = this.makeActionFrame(scene, x, y, radius);
     const glyph = this.makeButtonIcon(scene, x, y, radius, icon);
     frame.on("pointerdown", () => {
@@ -181,6 +257,7 @@ export class TouchControls {
     };
     frame.on("pointerup", clear);
     frame.on("pointerout", clear);
+    return { frame, glyph, radius };
   }
 
   /** 極簡扁平白細圓框（無填色），本身為互動命中目標 */

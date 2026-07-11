@@ -30,6 +30,7 @@ export class GameScene extends Phaser.Scene {
   private player!: Player;
   private controller!: PlayerController;
   private animator!: PlayerAnimator;
+  private touch!: TouchControls;
   private abilities!: AbilitySystem;
   private camera!: CameraSystem;
   private gameState!: GameState;
@@ -109,7 +110,7 @@ export class GameScene extends Phaser.Scene {
     this.sfx = new Sfx(this);
 
     // 觸控操作（僅手機／平板／小螢幕出現；桌機不建立）
-    new TouchControls(this, this.virtual);
+    this.touch = new TouchControls(this, this.virtual);
 
     // UI 以獨立 Scene 平行疊在遊戲畫面上方
     this.scene.launch(SceneKeys.UI);
@@ -122,6 +123,7 @@ export class GameScene extends Phaser.Scene {
     const wasGroundedBefore = this.wasGrounded;
     this.controller.update(delta);
     this.animator.update(delta);
+    this.touch.update(this.controller, this.abilities);
 
     // 所有碰撞判斷（掉落死亡、陷阱、互動）集中於此
     this.collisions.update();
