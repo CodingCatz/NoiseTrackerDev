@@ -138,7 +138,13 @@ export class CollisionSystem {
     if (cp.activated) return;
     cp.activated = true;
     // 存檔點視覺已改白色發光粒子（隱藏矩形）→ 啟用回饋改為白光爆發，不用 markActivated（會漏出白框）
-    glowBurst(this.scene, cp.x, cp.y - u(0.6));
+    // 範圍要顯眼、明顯大於人物（人物高約 u(1.0)）：半徑 u(1.2) → 直徑約人物 2.4 倍
+    glowBurst(this.scene, cp.x, cp.y - u(0.6), {
+      count: 16,
+      distance: u(1.2),
+      size: 28,
+      durationMs: 560,
+    });
     // 重生點設在 checkpoint 上方一點，重生後落地站定
     this.refs.checkpoints.setCheckpoint(cp.x, cp.y - u(1));
     this.refs.gameState.setCheckpoint(cp.objId);

@@ -106,6 +106,24 @@ export function glowBurst(
 ): void {
   const { count = 12, color = 0xffffff, distance = 44, size = 16, durationMs = 480 } = opts;
   const key = ensureSoftDotTexture(scene);
+
+  // 擴張衝擊環：從小圈擴到 distance 半徑並淡出，讓「範圍」邊界明確
+  const ring = scene.add
+    .circle(x, y, distance)
+    .setStrokeStyle(4, color, 0.9)
+    .setFillStyle(color, 0)
+    .setScale(0.25)
+    .setDepth(459)
+    .setBlendMode(Phaser.BlendModes.ADD);
+  scene.tweens.add({
+    targets: ring,
+    scale: 1,
+    alpha: 0,
+    duration: durationMs,
+    ease: "Cubic.out",
+    onComplete: () => ring.destroy(),
+  });
+
   for (let i = 0; i < count; i++) {
     const a = (Math.PI * 2 * i) / count + (i % 2) * 0.26; // 交錯抖動避免死板
     const dot = scene.add
