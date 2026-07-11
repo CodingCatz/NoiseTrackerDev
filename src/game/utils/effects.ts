@@ -63,6 +63,35 @@ export function ensureSoftDotTexture(scene: Phaser.Scene, key = "fx-soft-dot", r
 }
 
 /**
+ * 一次性建立紡錘狀拖尾貼圖：沿長軸(x)兩端 alpha 收尖、厚度方向(y)柔化。
+ * 供速度線用，讓線條兩端漸細而非矩形硬邊。
+ */
+export function ensureStreakTexture(scene: Phaser.Scene, key = "fx-streak", w = 64, h = 12): string {
+  if (scene.textures.exists(key)) return key;
+  const tex = scene.textures.createCanvas(key, w, h);
+  if (!tex) return key;
+  const ctx = tex.getContext();
+  const img = ctx.createImageData(w, h);
+  const cx = (w - 1) / 2;
+  const cy = (h - 1) / 2;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const tx = 1 - Math.abs(x - cx) / cx; // 長軸：兩端 0、中央 1
+      const ty = 1 - Math.abs(y - cy) / cy; // 厚度：邊緣 0、中央 1
+      const a = Math.pow(Math.max(0, tx), 1.7) * Math.pow(Math.max(0, ty), 0.85); // 兩端更尖
+      const idx = (y * w + x) * 4;
+      img.data[idx] = 255;
+      img.data[idx + 1] = 255;
+      img.data[idx + 2] = 255;
+      img.data[idx + 3] = Math.round(a * 255);
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  tex.refresh();
+  return key;
+}
+
+/**
  * 煙霧縷：於 (x,y) 冒出一縷灰白柔邊煙，邊擴張邊飄移邊淡出（一般混合，非加亮）。
  * 用於滑牆牆面摩擦；連續呼叫即成煙流。
  */
@@ -181,7 +210,7 @@ export function speedLines(
   const {
     count = 4,
     lengthRatio = 0.85,
-    thickness = 4,
+    thickness = 6,
     spread = 30,
     color = 0xffffff,
     alpha = 0.72,
@@ -197,34 +226,42 @@ export function speedLines(
   const perpX = -ny; // 垂直運動方向（用來散開多條線）
   const perpY = nx;
   const fullLen = Math.max(distance * lengthRatio, 1);
+  const key = ensureStreakTexture(scene);
+  const rand = (span: number) => (Math.random() - 0.5) * span; // 對稱抖動
 
   for (let i = 0; i < count; i++) {
     const t = count === 1 ? 0 : i / (count - 1) - 0.5; // -0.5 ~ 0.5
-    const offset = t * spread;
-    const lineLen = fullLen * (1 - Math.abs(t) * 0.25); // 中央最長、外側略短
-    // 錨在起點（origin 0,0.5 → 沿 +運動方向延伸），垂直散開
+    // 隨機抖動：長度、粗細、垂直位置、角度、濃淡、拉伸時間 — 讓線條不工整
+    const lineLen = fullLen * (1 - Math.abs(t) * 0.25) * (0.85 + Math.random() * 0.3);
+    const th = thickness * (0.7 + Math.random() * 0.7);
+    const offset = t * spread + rand(spread * 0.28);
     const ax = x + perpX * offset;
     const ay = y + perpY * offset;
 
-    const line = scene.add
-      .rectangle(ax, ay, lineLen, thickness, color)
+    // 紡錘貼圖：兩端漸細；origin(0,0.5) 錨在起點沿 +運動方向延伸
+    const streak = scene.add
+      .image(ax, ay, key)
       .setOrigin(0, 0.5)
-      .setRotation(angle)
+      .setDisplaySize(lineLen, th)
+      .setRotation(angle + rand(0.14))
+      .setTint(color)
       .setDepth(depth)
-      .setAlpha(alpha)
+      .setAlpha(alpha * (0.75 + Math.random() * 0.35))
       .setBlendMode(Phaser.BlendModes.ADD);
-    line.scaleX = 0;
+    const targetSX = streak.scaleX; // setDisplaySize 已設定，記下當目標
+    streak.scaleX = 0;
 
+    const grow = stretchMs * (0.85 + Math.random() * 0.4);
     // 拉伸：前緣跟著角色跑
-    scene.tweens.add({ targets: line, scaleX: 1, duration: stretchMs, ease: "Cubic.out" });
+    scene.tweens.add({ targets: streak, scaleX: targetSX, duration: grow, ease: "Cubic.out" });
     // 拉到一半後開始淡出
     scene.tweens.add({
-      targets: line,
+      targets: streak,
       alpha: 0,
-      delay: stretchMs * 0.5,
-      duration: durationMs - stretchMs * 0.5,
+      delay: grow * 0.5,
+      duration: durationMs - grow * 0.5,
       ease: "Quad.in",
-      onComplete: () => line.destroy(),
+      onComplete: () => streak.destroy(),
     });
   }
 }
