@@ -5,6 +5,12 @@
 
 ## [Unreleased]
 
+### Neon cut-out 部件 v2（單張部件表＋獨立雙臂）
+
+- 部件升級為 Codex「單張部件表」一次生成（部件間比例互鎖）＋保色去背切件：頭/軀幹/**獨立雙臂**/雙腿 6 件（`public/assets/char/parts/v2/`＋metrics.json）。
+- rig 全姿勢加入手臂表演：run 臂腿反相擺、jump/fall 揚臂、dash 後掠、wall 扶牆、land 外張平衡、idle 隨呼吸微晃。
+- 深度序：後臂→腿→軀幹→前臂→頭；顯示高度與 v1 一致（156px）；垂直位移改固定顯示像素常數。
+
 ### Neon cut-out 骨骼表演層（取代 AI 逐幀 strip 正式路線）
 
 - **背景**：AI 逐幀 strip 尺度飄移（忽大忽小）；跨 AI 評估結論為內建生圖無硬姿勢約束，CEO 拍板改走 cut-out rig（方案 A）。
