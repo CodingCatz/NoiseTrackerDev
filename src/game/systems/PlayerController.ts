@@ -240,8 +240,10 @@ export class PlayerController {
       this.abilities.useAirJump();
       this.isJumpRising = true;
       this.jumpBufferTimer = 0;
-      // 二段跳：向上噴速度線（線在腳下往下拖，強調躍起）
-      this.emitSpeedLines(0, -1, { count: 6, length: 22, spread: 30, distance: 40, durationMs: 260 });
+      // 二段跳：向上噴速度線，長度依躍起高度(apex = v²/2g)拉伸
+      const vJump = u(DOUBLE_JUMP_CONFIG.doubleJumpVelocityUnit);
+      const apex = (vJump * vJump) / (2 * u(PLAYER_PHYSICS.gravityUnit));
+      this.emitSpeedLines(0, -1, apex, { count: 4, spread: 26, stretchMs: 200, durationMs: 360 });
     }
   }
 
@@ -304,10 +306,10 @@ export class PlayerController {
 
   // #region 特效
 
-  /** 於角色碰撞盒中心沿指定方向噴速度線 */
-  private emitSpeedLines(dirX: number, dirY: number, opts?: Parameters<typeof speedLines>[5]): void {
+  /** 於角色碰撞盒中心沿指定方向噴速度線（distance＝本次動作位移 px，線長依此拉伸） */
+  private emitSpeedLines(dirX: number, dirY: number, distance: number, opts?: Parameters<typeof speedLines>[6]): void {
     const body = this.player.body as Phaser.Physics.Arcade.Body;
-    speedLines(this.scene, body.center.x, body.center.y, dirX, dirY, opts);
+    speedLines(this.scene, body.center.x, body.center.y, dirX, dirY, distance, opts);
   }
 
   // #endregion 特效
@@ -351,8 +353,13 @@ export class PlayerController {
     this.dashTimer = DASH_CONFIG.dashDurationMs;
     this.dashCooldownTimer = DASH_CONFIG.dashCooldownMs;
     this.abilities.useAirDash();
-    // 衝刺：沿衝刺方向噴速度線
-    this.emitSpeedLines(this.dashVX, this.dashVY, { count: 6, length: 34, spread: 40, distance: 60 });
+    // 衝刺：沿衝刺方向噴速度線，長度＝衝刺位移(dashDistance)的 85%，在衝刺時間內拉伸跟隨
+    this.emitSpeedLines(this.dashVX, this.dashVY, u(DASH_CONFIG.dashDistanceUnit), {
+      count: 5,
+      spread: 40,
+      stretchMs: DASH_CONFIG.dashDurationMs,
+      durationMs: DASH_CONFIG.dashDurationMs + 160,
+    });
 
     body.setAllowGravity(false);
     body.maxVelocity.y = Number.MAX_SAFE_INTEGER;

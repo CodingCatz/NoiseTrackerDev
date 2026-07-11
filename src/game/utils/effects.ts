@@ -135,7 +135,11 @@ export function glowBurst(
  * 線條沿運動軸擺放、垂直方向散開，往「逆運動方向」拖曳 → 讀成高速衝出。
  * 用於衝刺與二段跳；純 Phaser rectangle＋tween，無外部素材。
  *
- * @param dirX,dirY 運動方向（不需正規化，內部處理）；(0,-1)=向上、(1,0)=向右
+ * 拉伸拖尾：線在「起點」錨定，沿運動方向拉長到「位移距離的 lengthRatio(預設 0.85)」，
+ * 由 scaleX 0→1 拉伸過去（前緣跟著角色跑），拉滿後淡出。長度足以橫跨大半段位移。
+ *
+ * @param dirX,dirY 運動方向（不需正規化）；(0,-1)=向上、(1,0)=向右
+ * @param distance 本次動作的位移距離（px）；線長 = distance × lengthRatio
  */
 export function speedLines(
   scene: Phaser.Scene,
@@ -143,27 +147,28 @@ export function speedLines(
   y: number,
   dirX: number,
   dirY: number,
+  distance: number,
   opts: {
     count?: number;
-    length?: number;
+    lengthRatio?: number;
     thickness?: number;
     spread?: number;
-    distance?: number;
     color?: number;
     alpha?: number;
+    stretchMs?: number;
     durationMs?: number;
     depth?: number;
   } = {}
 ): void {
   const {
-    count = 5,
-    length = 28,
-    thickness = 3,
-    spread = 36,
-    distance = 48,
+    count = 4,
+    lengthRatio = 0.85,
+    thickness = 4,
+    spread = 30,
     color = 0xffffff,
-    alpha = 0.7,
-    durationMs = 220,
+    alpha = 0.72,
+    stretchMs = 130,
+    durationMs = 300,
     depth = 450,
   } = opts;
 
@@ -173,30 +178,34 @@ export function speedLines(
   const angle = Math.atan2(ny, nx); // 線條沿運動軸
   const perpX = -ny; // 垂直運動方向（用來散開多條線）
   const perpY = nx;
+  const fullLen = Math.max(distance * lengthRatio, 1);
 
   for (let i = 0; i < count; i++) {
     const t = count === 1 ? 0 : i / (count - 1) - 0.5; // -0.5 ~ 0.5
     const offset = t * spread;
-    // 起點：角色中心稍後方 + 垂直散開；線長隨散開位置略減，中央最長
-    const ox = x - nx * 4 + perpX * offset;
-    const oy = y - ny * 4 + perpY * offset;
-    const lineLen = length * (1 - Math.abs(t) * 0.45);
+    const lineLen = fullLen * (1 - Math.abs(t) * 0.25); // 中央最長、外側略短
+    // 錨在起點（origin 0,0.5 → 沿 +運動方向延伸），垂直散開
+    const ax = x + perpX * offset;
+    const ay = y + perpY * offset;
 
     const line = scene.add
-      .rectangle(ox, oy, lineLen, thickness, color)
+      .rectangle(ax, ay, lineLen, thickness, color)
+      .setOrigin(0, 0.5)
       .setRotation(angle)
       .setDepth(depth)
       .setAlpha(alpha)
       .setBlendMode(Phaser.BlendModes.ADD);
+    line.scaleX = 0;
 
+    // 拉伸：前緣跟著角色跑
+    scene.tweens.add({ targets: line, scaleX: 1, duration: stretchMs, ease: "Cubic.out" });
+    // 拉到一半後開始淡出
     scene.tweens.add({
       targets: line,
-      x: ox - nx * distance,
-      y: oy - ny * distance,
       alpha: 0,
-      scaleX: 0.25,
-      duration: durationMs,
-      ease: "Quad.out",
+      delay: stretchMs * 0.5,
+      duration: durationMs - stretchMs * 0.5,
+      ease: "Quad.in",
       onComplete: () => line.destroy(),
     });
   }
