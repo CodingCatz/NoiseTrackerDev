@@ -1,7 +1,7 @@
 import Phaser from "phaser";
 import { Player } from "../entities/Player";
 import { PlayerController } from "./PlayerController";
-import { CHAR_CELL, CHAR_BASELINE, PRESENTATION_SCALE, NEON_CLIPS, type AnimClip } from "../data/characterAnim";
+import { CHAR_CELL, CHAR_BASELINE, CHAR_SOURCE, PRESENTATION_SCALE, NEON_CLIPS, type AnimClip } from "../data/characterAnim";
 import { RIG_PRELOAD } from "../data/neonRig";
 import { CutoutRig, type RigState } from "./CutoutRig";
 import { PLAYER_PHYSICS } from "../data/playerPhysics";
@@ -49,7 +49,7 @@ export class PlayerAnimator {
     this.player = player;
     this.controller = controller;
 
-    if (CutoutRig.texturesReady(scene)) {
+    if (CHAR_SOURCE === "rig" && CutoutRig.texturesReady(scene)) {
       this.mode = "rig";
       this.rig = new CutoutRig(scene);
       player.setVisible(false);

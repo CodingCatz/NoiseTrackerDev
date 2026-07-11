@@ -4,6 +4,12 @@
  * 每 clip 一條橫向 strip PNG（public/assets/char/），格寬 = CHAR_CELL，幀由左到右。
  */
 
+/**
+ * 表演層來源：CEO 拍板（2026-07-11）採「骨架姿勢參考逐格圖」路線——
+ * strip 為正式來源；cut-out rig 程式保留但停用（程序式動態不合格）。
+ */
+export const CHAR_SOURCE: "strip" | "rig" = "strip";
+
 /** 每幀畫布邊長（strip 以此切格：frameWidth = frameHeight = CHAR_CELL） */
 export const CHAR_CELL = 256;
 
