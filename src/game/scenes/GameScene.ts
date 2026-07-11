@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import { SceneKeys } from "../config/sceneKeys";
 import { Player } from "../entities/Player";
 import { PlayerController } from "../systems/PlayerController";
+import { PlayerAnimator } from "../systems/PlayerAnimator";
 import { AbilitySystem } from "../systems/AbilitySystem";
 import { LevelSystem } from "../systems/LevelSystem";
 import { CameraSystem } from "../systems/CameraSystem";
@@ -28,6 +29,7 @@ import { Sfx } from "../utils/sfx";
 export class GameScene extends Phaser.Scene {
   private player!: Player;
   private controller!: PlayerController;
+  private animator!: PlayerAnimator;
   private abilities!: AbilitySystem;
   private camera!: CameraSystem;
   private gameState!: GameState;
@@ -78,6 +80,8 @@ export class GameScene extends Phaser.Scene {
     // 虛擬輸入（觸控按鈕寫入、控制器讀取）
     this.virtual = new VirtualInput();
     this.controller = new PlayerController(this, this.player, this.abilities, this.virtual);
+    // 表演層（控制器/碰撞體分離）：動畫 strip 就緒才啟用，否則休眠
+    this.animator = new PlayerAnimator(this, this.player, this.controller);
 
     // 所有碰撞判斷集中於此
     this.collisions = new CollisionSystem(this, {
@@ -117,6 +121,7 @@ export class GameScene extends Phaser.Scene {
   update(_time: number, delta: number): void {
     const wasGroundedBefore = this.wasGrounded;
     this.controller.update(delta);
+    this.animator.update(delta);
 
     // 所有碰撞判斷（掉落死亡、陷阱、互動）集中於此
     this.collisions.update();

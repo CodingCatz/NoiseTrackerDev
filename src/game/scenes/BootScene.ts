@@ -18,6 +18,7 @@ export class BootScene extends Phaser.Scene {
     for (const icon of ICON_PRELOAD) {
       this.load.image(icon.key, `assets/ui/skills/${icon.file}`);
     }
+    // 動畫 strip 待 Codex 交付後，於此加 `PlayerAnimator.preload(this)` 即自動啟用表演層
   }
 
   create(): void {

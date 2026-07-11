@@ -5,6 +5,13 @@
 
 ## [Unreleased]
 
+### 角色動畫控制層（表演層／控制器分離）
+
+- 新增 `data/characterAnim.ts`：Neon 逐幀動畫的幀表契約（8 個 clip：idle/turn/run/dash/jump_rise/jump_fall/land/wall_slide，含幀數/fps/loop、cell 256、腳底基線 232），與共享 skill `sprite-animation-sheets` 及美術產圖規格一致。
+- 新增 `systems/PlayerAnimator.ts`：玩家「表演層」，與碰撞體/控制器分離（同 3D：控制器＋模型子物件）。碰撞體維持不動；獨立 sprite 每幀同步玩家位置、腳底對齊碰撞體底部、依面向 flipX、依 `PlayerController.currentState` 切 clip（含落地/轉向轉場態）。
+- GameScene 接線 animator。
+- **目前休眠**：動畫 strip 素材尚未交付（跨 AI 派工由 Codex 產製中）；strip 就緒後於 BootScene 加一行 `PlayerAnimator.preload(this)` 即自動啟用，屆時再校正 `PRESENTATION_SCALE`。以佔位 strip 驗證過表演層同步/播放/翻面/落地對齊皆正常。
+
 ### HUD／觸控全面圖示化（人形剪影 + 半透光暈）
 
 - **動作技能人形剪影素材**：`public/assets/ui/skills/` 新增純白透明剪影 PNG（jump／double_jump／dash／wall_jump／wall_slide／ground_pound／key），全白便於 runtime `setTint` 染色、`setAlpha` 調透明。素材經跨 AI 派工（SBM 工單）由 Codex 以「內建作圖綠幕 → 本機去背」產出。
