@@ -10,7 +10,7 @@ import { VirtualInput } from "./VirtualInput";
 import { GameState } from "./GameState";
 import { CheckpointSystem } from "./CheckpointSystem";
 import { INTERACTABLE_META } from "../data/interactables";
-import { popOnce } from "../utils/effects";
+import { popOnce, glowBurst } from "../utils/effects";
 import { u } from "../utils/units";
 
 /** CollisionSystem 發送的事件名稱 */
@@ -137,7 +137,8 @@ export class CollisionSystem {
   private activateCheckpoint(cp: Interactable): void {
     if (cp.activated) return;
     cp.activated = true;
-    cp.markActivated(0x7dffa8);
+    // 存檔點視覺已改白色發光粒子（隱藏矩形）→ 啟用回饋改為白光爆發，不用 markActivated（會漏出白框）
+    glowBurst(this.scene, cp.x, cp.y - u(0.6));
     // 重生點設在 checkpoint 上方一點，重生後落地站定
     this.refs.checkpoints.setCheckpoint(cp.x, cp.y - u(1));
     this.refs.gameState.setCheckpoint(cp.objId);

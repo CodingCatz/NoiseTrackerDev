@@ -5,6 +5,7 @@ import type { LevelConfig, LevelObjectConfig } from "../types/LevelTypes";
 import { INTERACTABLE_META } from "../data/interactables";
 import { KEY_ICON, KEY_TINT } from "../data/abilities";
 import { u } from "../utils/units";
+import { ensureSoftDotTexture } from "../utils/effects";
 
 /** 開關與其連動目標 */
 export interface SwitchEntry {
@@ -42,9 +43,12 @@ export class InteractionSystem {
           this.keys.push(key);
           break;
         }
-        case "checkpoint":
-          this.checkpoints.push(this.spawn(obj, u(0.6), u(1.2)));
+        case "checkpoint": {
+          const cp = this.spawn(obj, u(0.6), u(1.2));
+          this.decorateCheckpoint(cp);
+          this.checkpoints.push(cp);
           break;
+        }
         case "switch":
           this.switches.push({ entity: this.spawn(obj, u(1), u(0.3)), targetId: obj.targetId, on: false });
           break;
@@ -92,6 +96,33 @@ export class InteractionSystem {
       ease: "Sine.inOut",
     });
     key.once(Phaser.GameObjects.Events.DESTROY, () => icon.destroy());
+  }
+
+  /**
+   * 存檔點改以「白色發光粒子」呈現：隱藏原矩形（保留 overlap 物理身體），
+   * 疊上持續上飄的白色柔光粒子當 beacon；destroy 時連帶清掉粒子。
+   */
+  private decorateCheckpoint(cp: Interactable): void {
+    cp.setFillStyle(0xffffff, 0); // 矩形隱形，僅保留 overlap 用的物理身體
+    const key = ensureSoftDotTexture(this.scene);
+    const cx = cp.x;
+    const cy = cp.y - u(1.2) / 2; // Interactable origin(0.5,1)，中心上移半高
+    const emitter = this.scene.add
+      .particles(cx, cy, key, {
+        x: { min: -u(0.22), max: u(0.22) },
+        y: { min: -u(0.45), max: u(0.45) },
+        speedY: { min: -u(0.55), max: -u(0.2) },
+        lifespan: 1000,
+        scale: { start: 0.55, end: 0 },
+        alpha: { start: 0.75, end: 0 },
+        frequency: 130,
+        quantity: 1,
+        blendMode: "ADD",
+        tint: 0xffffff,
+      })
+      .setDepth(300);
+    cp.setData("emitter", emitter);
+    cp.once(Phaser.GameObjects.Events.DESTROY, () => emitter.destroy());
   }
 
   /** 依物件設定與尺寸建立 Interactable */

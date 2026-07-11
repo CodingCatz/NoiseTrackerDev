@@ -11,7 +11,7 @@ import {
 } from "../data/playerPhysics";
 import { u } from "../utils/units";
 import { moveTowards, clamp } from "../utils/math";
-import { speedLines } from "../utils/effects";
+import { speedLines, smokePuff } from "../utils/effects";
 
 /** 由 dash 距離與時間推導的衝刺速度（px/s） */
 const DASH_SPEED_PX = u(DASH_CONFIG.dashDistanceUnit) / (DASH_CONFIG.dashDurationMs / 1000);
@@ -56,6 +56,8 @@ export class PlayerController {
   private wallJumpLockTimer = 0;
   private isWallSlidingNow = false;
   private touchingWallSide: WallSide = 0;
+  /** 滑牆摩擦煙的節流計時（ms），歸零時冒一縷 */
+  private wallSmokeTimer = 0;
 
   constructor(scene: Phaser.Scene, player: Player, abilities: AbilitySystem, virtual: VirtualInput) {
     this.scene = scene;
@@ -164,7 +166,26 @@ export class PlayerController {
     if (body.velocity.y >= 0) this.isJumpRising = false;
 
     this.applyWallSlide(body, grounded, wall);
+    this.updateWallSmoke(body, deltaMs);
     this.applyGravityScale(body);
+  }
+
+  /** 滑牆時於牆面接觸點週期冒摩擦煙，往離牆＋向上方向飄散 */
+  private updateWallSmoke(body: Phaser.Physics.Arcade.Body, deltaMs: number): void {
+    if (!this.isWallSlidingNow || this.touchingWallSide === 0) {
+      this.wallSmokeTimer = 0;
+      return;
+    }
+    this.wallSmokeTimer -= deltaMs;
+    if (this.wallSmokeTimer > 0) return;
+    this.wallSmokeTimer = 80; // 每 80ms 一縷
+
+    const wx = this.touchingWallSide < 0 ? body.left : body.right;
+    const wy = body.bottom - body.height * 0.25; // 靠下的摩擦點
+    smokePuff(this.scene, wx, wy, {
+      driftX: -this.touchingWallSide * u(0.35), // 往離牆方向飄
+      driftY: -u(0.45),
+    });
   }
 
   // #region 水平移動
