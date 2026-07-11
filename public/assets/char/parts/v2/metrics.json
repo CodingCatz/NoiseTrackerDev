@@ -1,0 +1,16 @@
+{
+  "coordinateSystem": "Each part's top-left offset is relative to the assembled character's foot-bottom center at (0, 0); y increases downward.",
+  "assemblyReference": {
+    "facing": "right",
+    "source": "single generated component sheet; preserve-color chroma key removed; each PNG trimmed to alpha bbox plus 2px margin",
+    "recommendedRigScale": 0.34
+  },
+  "parts": {
+    "head": { "file": "neon_head.png", "w": 383, "h": 473, "dx": -210, "dy": -1050 },
+    "torso": { "file": "neon_torso.png", "w": 352, "h": 365, "dx": -176, "dy": -630 },
+    "armL": { "file": "neon_armL.png", "w": 105, "h": 238, "dx": -218, "dy": -590 },
+    "armR": { "file": "neon_armR.png", "w": 103, "h": 239, "dx": 118, "dy": -590 },
+    "legL": { "file": "neon_legL.png", "w": 151, "h": 264, "dx": -155, "dy": -264 },
+    "legR": { "file": "neon_legR.png", "w": 152, "h": 263, "dx": 4, "dy": -263 }
+  }
+}
