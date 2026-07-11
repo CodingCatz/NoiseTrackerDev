@@ -11,6 +11,7 @@ import {
 } from "../data/playerPhysics";
 import { u } from "../utils/units";
 import { moveTowards, clamp } from "../utils/math";
+import { speedLines } from "../utils/effects";
 
 /** 由 dash 距離與時間推導的衝刺速度（px/s） */
 const DASH_SPEED_PX = u(DASH_CONFIG.dashDistanceUnit) / (DASH_CONFIG.dashDurationMs / 1000);
@@ -24,6 +25,7 @@ type WallSide = -1 | 0 | 1;
  * Phase 8 加入牆滑（限速下滑）與牆跳（推離牆面 + 短暫鎖水平輸入避免黏牆）。
  */
 export class PlayerController {
+  private readonly scene: Phaser.Scene;
   private readonly player: Player;
   private readonly abilities: AbilitySystem;
   private readonly virtual: VirtualInput;
@@ -56,6 +58,7 @@ export class PlayerController {
   private touchingWallSide: WallSide = 0;
 
   constructor(scene: Phaser.Scene, player: Player, abilities: AbilitySystem, virtual: VirtualInput) {
+    this.scene = scene;
     this.player = player;
     this.abilities = abilities;
     this.virtual = virtual;
@@ -216,6 +219,8 @@ export class PlayerController {
       this.abilities.useAirJump();
       this.isJumpRising = true;
       this.jumpBufferTimer = 0;
+      // 二段跳：向上噴速度線（線在腳下往下拖，強調躍起）
+      this.emitSpeedLines(0, -1, { count: 6, length: 22, spread: 30, distance: 40, durationMs: 260 });
     }
   }
 
@@ -276,6 +281,16 @@ export class PlayerController {
 
   // #endregion 牆滑與牆跳
 
+  // #region 特效
+
+  /** 於角色碰撞盒中心沿指定方向噴速度線 */
+  private emitSpeedLines(dirX: number, dirY: number, opts?: Parameters<typeof speedLines>[5]): void {
+    const body = this.player.body as Phaser.Physics.Arcade.Body;
+    speedLines(this.scene, body.center.x, body.center.y, dirX, dirY, opts);
+  }
+
+  // #endregion 特效
+
   // #region Dash
 
   /** 衝刺處理。回傳 true 表示本幀由衝刺接管 */
@@ -315,6 +330,8 @@ export class PlayerController {
     this.dashTimer = DASH_CONFIG.dashDurationMs;
     this.dashCooldownTimer = DASH_CONFIG.dashCooldownMs;
     this.abilities.useAirDash();
+    // 衝刺：沿衝刺方向噴速度線
+    this.emitSpeedLines(this.dashVX, this.dashVY, { count: 6, length: 34, spread: 40, distance: 60 });
 
     body.setAllowGravity(false);
     body.maxVelocity.y = Number.MAX_SAFE_INTEGER;
