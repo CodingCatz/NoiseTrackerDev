@@ -5,6 +5,10 @@
 
 ## [Unreleased]
 
+### Neon wall-slide 頭身比校正
+
+- 重繪 `public/assets/char/neon_wall_slide.png`：以已核可的 dash 姿勢為比例錨點，縮小頭部與整體比例；維持 256×256 RGBA、透明四角與腳底基線 y=232。`neon_dash.png` 未變更。
+
 ### Neon 固定骨架逐幀 strip
 
 - 正式素材改回 18 張「外觀錨 `stand.png` + 對應固定骨長姿勢圖」獨立生成的逐幀流程，不使用前一格生成結果作參考；覆寫 8 條 `public/assets/char/neon_*.png` strip。
