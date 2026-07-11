@@ -3,6 +3,7 @@ import { SceneKeys, TextureKeys } from "../config/sceneKeys";
 import { u } from "../utils/units";
 import { runDataValidation } from "../utils/validateData";
 import { ICON_PRELOAD } from "../data/abilities";
+import { PlayerAnimator } from "../systems/PlayerAnimator";
 
 /**
  * BootScene：載入前置資源並以 graphics 產生 placeholder 貼圖，
@@ -18,7 +19,7 @@ export class BootScene extends Phaser.Scene {
     for (const icon of ICON_PRELOAD) {
       this.load.image(icon.key, `assets/ui/skills/${icon.file}`);
     }
-    // 動畫 strip 待 Codex 交付後，於此加 `PlayerAnimator.preload(this)` 即自動啟用表演層
+    PlayerAnimator.preload(this); // 角色動畫 strip（表演層啟用）
   }
 
   create(): void {
