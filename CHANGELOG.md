@@ -5,6 +5,12 @@
 
 ## [Unreleased]
 
+### Neon 固定骨架逐幀 strip
+
+- 正式素材改回 18 張「外觀錨 `stand.png` + 對應固定骨長姿勢圖」獨立生成的逐幀流程，不使用前一格生成結果作參考；覆寫 8 條 `public/assets/char/neon_*.png` strip。
+- 所有 strip 皆為 RGBA、cell 256、腳底基線 y=232；新增 `scripts/pack-strip.py` 統一以 alpha 裁切、縮放、基線對齊並打包，去背採保色 chroma-key 流程。
+- cut-out rig 已停用，遊戲端 `CHAR_SOURCE=strip` 可直接使用本次交付素材。
+
 ### Neon cut-out 部件 v2（單張部件表＋獨立雙臂）
 
 - 部件升級為 Codex「單張部件表」一次生成（部件間比例互鎖）＋保色去背切件：頭/軀幹/**獨立雙臂**/雙腿 6 件（`public/assets/char/parts/v2/`＋metrics.json）。
@@ -32,7 +38,7 @@
 - 新增 `data/characterAnim.ts`：Neon 逐幀動畫的幀表契約（8 個 clip：idle/turn/run/dash/jump_rise/jump_fall/land/wall_slide，含幀數/fps/loop、cell 256、腳底基線 232），與共享 skill `sprite-animation-sheets` 及美術產圖規格一致。
 - 新增 `systems/PlayerAnimator.ts`：玩家「表演層」，與碰撞體/控制器分離（同 3D：控制器＋模型子物件）。碰撞體維持不動；獨立 sprite 每幀同步玩家位置、腳底對齊碰撞體底部、依面向 flipX、依 `PlayerController.currentState` 切 clip（含落地/轉向轉場態）。
 - GameScene 接線 animator。
-- **目前休眠**：動畫 strip 素材尚未交付（跨 AI 派工由 Codex 產製中）；strip 就緒後於 BootScene 加一行 `PlayerAnimator.preload(this)` 即自動啟用，屆時再校正 `PRESENTATION_SCALE`。以佔位 strip 驗證過表演層同步/播放/翻面/落地對齊皆正常。
+- 後續實際 strip 素材以固定骨架姿勢參考圖重製後交付；遊戲端 `CHAR_SOURCE=strip` 已就緒。
 
 ### HUD／觸控全面圖示化（人形剪影 + 半透光暈）
 
